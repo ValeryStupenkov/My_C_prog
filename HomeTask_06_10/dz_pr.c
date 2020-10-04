@@ -2,16 +2,22 @@
 #include <stdio.h>
 
 #define MAX 1024
+#define YES 1
+#define NO 0
 
 char *str1;
 char *str2;
 
-int main()
+int main(int argc, char *argv[])
 {
-     int i=0,rav=1;
+     int i=0,rav=YES;
+     if (argc!=3){
+        printf("После имени программы должны быть введены названия двух файлов\n");
+        exit(1);
+     }
 
-     FILE* f1=fopen("file1.txt","r");
-     FILE* f2=fopen("file2.txt","r");
+     FILE *f1=fopen(argv[1],"r");
+     FILE *f2=fopen(argv[2],"r");
      while (!feof(f1)&&!feof(f2)){
          str1=malloc(MAX);
          str2=malloc(MAX);
@@ -21,7 +27,7 @@ int main()
          }
          if (str1[i]!=str2[i]){
              puts(str1);
-             rav=0;
+             rav=NO;
              break;
          }
          else{
@@ -31,7 +37,7 @@ int main()
          }
          }
      }
-     if (rav==1){
+     if (rav){
          printf("Все строки равны\n");
          free(str1);
          free(str2);
