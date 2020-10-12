@@ -5,7 +5,6 @@
 
 #define YES 1
 #define NO 0 
-#define MAXWORD 100
 
 struct tnode{
     char *word;
@@ -58,8 +57,8 @@ struct tnode *addnewtree(struct tnode *newp,char *w,int count)
 
 struct tnode *vvod(struct tnode *tree,FILE *f)
 {
-    int i=0;
-    char word[MAXWORD];
+    int i=0,size=1;
+    char *word=NULL;
     char c;
     while ((c=fgetc(f))!=EOF){
         if (isspace(c)){
@@ -67,6 +66,9 @@ struct tnode *vvod(struct tnode *tree,FILE *f)
                 kol++;
                 word[i]='\0';
                 tree=addtree(tree,word);
+                free(word);
+                word=NULL;
+                size=1;
                 i=0;
             }
         }
@@ -76,19 +78,39 @@ struct tnode *vvod(struct tnode *tree,FILE *f)
                     kol++;
                     word[i]='\0';
                     tree=addtree(tree,word);
+                    free(word);
+                    word=NULL;
+                    size=1;
                     i=0;
                 }
                 kol++;
+                word=realloc(word,size+1);
                 word[i]=c;
                 word[i+1]='\0';
                 tree=addtree(tree,word);
+                free(word);
+                word=NULL;
                 i=0;
             }  
             else{
+                if ((i+1)==size){
+                    size=2*size+1;
+                    word=realloc(word,size);
+                    if (word==NULL){
+                        fprintf(stderr,"Error\n");
+                        exit(1);
+                    }
+                }
                 word[i]=c;
                 i++;
             }
         }
+    }
+    if (word!=NULL){
+        kol++;
+        word[i]='\0';
+        tree=addtree(tree,word);
+        free(word);
     }
     return tree;
 }
