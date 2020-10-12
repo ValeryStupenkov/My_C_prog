@@ -39,7 +39,8 @@ struct tnode *addnewtree(struct tnode *newp,char *w,int count)
     if (newp==NULL){
             newp=malloc(sizeof(struct tnode));
             newp->count=count;
-            newp->word=w;
+            newp->word=strdup(w);
+            free(w);
             newp->left=newp->right=NULL;
         }
      else if (count<newp->count)
@@ -77,6 +78,7 @@ struct tnode *vvod(struct tnode *tree,FILE *f)
                     tree=addtree(tree,word);
                     i=0;
                 }
+                kol++;
                 word[i]=c;
                 word[i+1]='\0';
                 tree=addtree(tree,word);
@@ -94,6 +96,7 @@ struct tnode *vvod(struct tnode *tree,FILE *f)
 struct tnode *buildnewtree(struct tnode *p, struct tnode *newp)
 {
     struct tnode *stack[100];
+    struct tnode *med;
     int top=0,i=0;
     if (p==NULL)
         return NULL;
@@ -106,7 +109,9 @@ struct tnode *buildnewtree(struct tnode *p, struct tnode *newp)
         p=stack[top--];
         if (p!=NULL){
             newp=addnewtree(newp,p->word,p->count);
-            p=p->right;
+            med=p->right;
+            free(p);
+            p=med;
         }
         else 
             break;
@@ -125,19 +130,11 @@ void printnewtree(struct tnode *newp,FILE *fl)
     }
 }
 
-void eliminate(struct tnode *p)
-{
-    if (p!=NULL){
-        eliminate(p->left);
-        eliminate(p->right);
-        free(p);
-    }
-}
 void eliminatenew(struct tnode *p)
 {
     if (p!=NULL){
-        eliminate(p->left);
-        eliminate(p->right);
+        eliminatenew(p->left);
+        eliminatenew(p->right);
         free(p->word);
         free(p);
     }
@@ -190,7 +187,6 @@ int main(int argc,char *argv[])
         fclose(f1);
     if (isout)
         fclose(f2);
-    eliminate(tree);
     eliminatenew(new);
     return 0;
 }
