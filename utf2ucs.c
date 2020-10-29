@@ -7,15 +7,24 @@ void inout(FILE *f1,FILE *f2,int bom)
     unsigned short ch=0,a;
     while ((i=fread(&c,sizeof(char),1,f1))==1){
         if ((j=c&0X80)==0){
-            ch=c;
-            if (bom==0){
-                a=ch&0x00ff;
-                a=a<<8;
-                ch=ch>>8;
-                ch=ch|a;
+            if (prev!=0){
+                fprintf(stderr,"Некорректный символ:%c\n",c);
+                fprintf(stderr,"Смещение относительно начала файла:%ld",ftell(f1));
+                prev=0;
+                prev2=0;
+                ch=0;
             }
-            fwrite(&ch,sizeof(unsigned short),1,f2);
-            ch=0;
+            else{
+                ch=c;
+                if (bom==0){
+                    a=ch&0x00ff;
+                    a=a<<8;
+                    ch=ch>>8;
+                    ch=ch|a;
+                }
+                fwrite(&ch,sizeof(unsigned short),1,f2);
+                ch=0;
+            }
         }
         else if (prev==110&&(j=c&0xc0)==0x80){
             c=c&0x3F;
@@ -48,23 +57,37 @@ void inout(FILE *f1,FILE *f2,int bom)
         }
         else{
             if ((j=c&0xe0)==0xc0){
+                if (prev==110){
+                    fprintf(stderr,"Некорректный символ:%c\n",c);
+                    fprintf(stderr,"Смещение относительно начала файла:%ld",ftell(f1)-1);
+                }
                 c=c&0x1F;
                 ch=c;
                 ch=ch<<6;
                 prev=110;
             }  
             else if ((j=c&0xe0)==0xe0){
+                if (prev==111){
+                    fprintf(stderr,"Некорректный символ:%c\n",c);
+                    fprintf(stderr,"Смещение относительно начала файла:%ld",ftell(f1)-1);
+                }
                 c=c&0x0F;
                 ch=c;
                 ch=ch<<12;
                 prev=111;
             }  
             else if ((j=c&0xc0)==0x80){
-                c=c&0x3F;
-                a=c;
-                a=a<<6;
-                ch=ch|a;
-                prev2=10;
+                if (prev==0){
+                    fprintf(stderr,"Некорректный символ:%c\n",c);
+                    fprintf(stderr,"Смещение относительно начала файла:%ld",ftell(f1));
+                }
+                else{
+                    c=c&0x3F;
+                    a=c;
+                    a=a<<6;
+                    ch=ch|a;
+                    prev2=10;
+                }
             }
         }
     }

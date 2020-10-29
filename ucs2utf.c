@@ -3,13 +3,19 @@
 void inout(FILE *f1,FILE *f2,int bom)
 {
     unsigned short ch,a,b;
-    char c;
+    unsigned char c,mid[2];
     int i;
-    while ((i=fread(&ch,sizeof(unsigned short),1,f1))==1){
-        if (bom!=1){
-            a=ch&0x00ff;
+    while ((i=fread(&mid,sizeof(char),2,f1))==2){
+        if (bom==1){
+            ch=mid[0];
+            a=mid[1];
             a=a<<8;
-            ch=ch>>8;
+            ch=ch|a;    
+        }
+        else{
+            ch=mid[0];
+            ch=ch<<8;
+            a=mid[1];
             ch=ch|a;
         }
         if (ch<=127){
@@ -44,14 +50,15 @@ void inout(FILE *f1,FILE *f2,int bom)
             fwrite(&c,sizeof(char),1,f2);
         }
     }
-    
+    if (i==1)
+        fprintf(stderr,"В файле нечётное количество байтов!\n");
 }
 
 int main(int argc, char *argv[])
 {
     FILE *f1=stdin;
     FILE *f2=stdout;
-    int bom=0,i;
+    int bom=1,i;
     if (argc==3){
         f1=fopen(argv[1],"r");
         f2=fopen(argv[2],"w");
@@ -72,9 +79,9 @@ int main(int argc, char *argv[])
         if (utf16ch==0xfeff)
             bom=1;
         else if (utf16ch==0xfffe)   
-            bom=0; /*0-обратный порядок,1-прямой*/
+            bom=0; /*1-обратный порядок,0-прямой*/
         else{
-            bom=0;
+            bom=1;
             fseek(f1,0,SEEK_SET);
         }
     }
