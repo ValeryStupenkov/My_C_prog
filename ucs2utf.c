@@ -76,6 +76,7 @@ int main(int argc, char *argv[])
     }
     unsigned short utf16ch;
     if ((i=fread(&utf16ch,sizeof (unsigned short),1,f1))==1){
+        fprintf(stderr,"i=%d",i);
         if (utf16ch==0xfeff)
             bom=1;
         else if (utf16ch==0xfffe)   
