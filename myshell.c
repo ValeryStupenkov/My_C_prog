@@ -12,7 +12,7 @@ void directory(void)
 {
     char buf[PATH_MAX];
     if (getcwd(buf,PATH_MAX)!=NULL)
-        printf("%s$ ",buf);
+        printf("\33[33m%s$\33[0m ",buf);
     else 
         perror("Ошибка в getcwd");
 }
@@ -58,7 +58,7 @@ int main()
 
     directory();   
     while ((c=getchar())!=EOF){
-        if (c=='\n'){
+        if (c=='\n' && kav==0){
             if (w!=NULL){
                 w[i]='\0';
                 words=realloc(words,sizeof(char**)*(j+1));
