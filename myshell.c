@@ -19,11 +19,72 @@ void directory(void)
         perror("Ошибка в getcwd");
 }
 
+void ChangeInOut(char **words, int j)
+{ /*перенаправляет ввод, вывод*/
+    int i,flag=0;
+    
+    for (i=0;i<j-1;i++){
+        if (flag==0){
+            if (strcmp(words[i],">")==0){
+                if (words[i+1]==NULL){
+                    fprintf(stderr,"Ошибка в перенаправлении");
+                    break;
+                }
+                int fd=open(words[i+1],O_WRONLY | O_CREAT | O_TRUNC,0666);
+                if (fd<0){
+                    fprintf(stderr,"Ошибка при открытии/создании файла");
+                    break;
+                } 
+                dup2(fd,STDOUT_FILENO);
+                close(fd);  
+                flag=1;
+            }
+            else if (strcmp(words[i],"<")==0){
+                if (words[i+1]==NULL){
+                    fprintf(stderr,"Ошибка в перенаправлении");
+                    break;
+                }
+                int fd=open(words[i+1], O_RDONLY,0);
+                if (fd<0){
+                    fprintf(stderr,"Ошибка при открытии/создании файла");
+                    break;
+                }
+                dup2(fd,STDIN_FILENO);
+                close(fd); 
+                flag=1;        
+            } 
+            else if (strcmp(words[i],">>")==0){
+                if (words[i+1]==NULL){
+                    fprintf(stderr,"Ошибка в перенаправлении");
+                    break;
+                }
+                int fd=open(words[i+1], O_WRONLY | O_CREAT | O_APPEND,0666);  
+                    if (fd<0){
+                        fprintf(stderr,"Ошибка при открытии/создании файла");
+                        break;
+                    }
+                    dup2(fd,STDOUT_FILENO);
+                    close(fd);
+                    flag=1;          
+            } 
+        }
+        if (flag==1){
+            free(words[i+1]);
+            words[i+1]=NULL;
+            free(words[i]);
+            words[i]=NULL;
+            flag++;
+        }
+        else if (flag==2)
+            flag=0;
+    } 
+    return;   
+}
+
 int processing(char **words,int j)
 {
     char *home=NULL;
     int i,a,pid;
-    int flag=0;
     if (words!=NULL){
         if (strcmp(words[0],"exit")==0)
             return 2;
@@ -41,63 +102,7 @@ int processing(char **words,int j)
             /*Создание нoвого процесса, вызов программы*/
             if ((pid=fork())==0){
                 /*перед execvp если есть > or >> or < то перенаправление вывода, ввода */
-                /*нужно добавить удаление символов >,<,>> из массива слов!!!!*/
-                for (i=0;i<j-1;i++){
-                    if (flag==0){
-                        if (strcmp(words[i],">")==0){
-                            if (words[i+1]==NULL){
-                                fprintf(stderr,"Ошибка в перенаправлении");
-                                break;
-                            }
-                            int fd=open(words[i+1],O_WRONLY | O_CREAT | O_TRUNC,0666);
-                            if (fd<0){
-                                fprintf(stderr,"Ошибка при открытии/создании файла");
-                                break;
-                            } 
-                            dup2(fd,STDOUT_FILENO);
-                            close(fd);  
-                            flag=1;
-                        }
-                        else if (strcmp(words[i],"<")==0){
-                            if (words[i+1]==NULL){
-                                fprintf(stderr,"Ошибка в перенаправлении");
-                                break;
-                            }
-                            int fd=open(words[i+1], O_RDONLY,0);
-                            if (fd<0){
-                                fprintf(stderr,"Ошибка при открытии/создании файла");
-                                break;
-                            }
-                            dup2(fd,STDIN_FILENO);
-                            close(fd); 
-                            flag=1;        
-                        } 
-                        else if (strcmp(words[i],">>")==0){
-                            if (words[i+1]==NULL){
-                                fprintf(stderr,"Ошибка в перенаправлении");
-                                break;
-                            }
-                            int fd=open(words[i+1], O_WRONLY | O_CREAT | O_APPEND,0666);  
-                            if (fd<0){
-                                fprintf(stderr,"Ошибка при открытии/создании файла");
-                                break;
-                            }
-                            dup2(fd,STDOUT_FILENO);
-                            close(fd);
-                            flag=1;          
-                        } 
-                    }
-                    if (flag==1){
-                        free(words[i+1]);
-                        words[i+1]=NULL;
-                        free(words[i]);
-                        words[i]=NULL;
-                        flag++;
-                    }
-                    else if (flag==2)
-                        flag=0;
-                }
-                
+                ChangeInOut(words,j);
                 execvp(words[0],words);
                 perror("Execvp error");
                 return 1;
@@ -117,7 +122,8 @@ int PipeN(char **words,int j)
 {
     int fd[2],i=0,a=0,b=0,pid;
     char **mas=NULL;
-
+    
+    ChangeInOut(words,j);
     while (words[i]!=NULL){
         if (strcmp(words[i],"|")==0){
             mas=realloc(mas,sizeof(char**)*(a+1));
