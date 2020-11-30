@@ -164,19 +164,24 @@ int PipeN(char **words,int j)
             i++;  
         }     
     }
-    if ((pid=fork())==0){
-        mas=realloc(mas,sizeof(char**)*(a+1));
-        mas[a]=NULL;
-        execvp(mas[0],mas);
-        perror("Execvp error");
-        return 4;    
+    if (mas==NULL){
+        fprintf(stderr,"Error!!!\n");
     }
-    else if (pid<0){
-        perror("Fork error");
-        return 5;
-    } 
-    else 
-        wait(NULL); 
+    else{ 
+        if ((pid=fork())==0){
+            mas=realloc(mas,sizeof(char**)*(a+1));
+            mas[a]=NULL;
+            execvp(mas[0],mas);
+            perror("Execvp error");
+            return 4;    
+        }
+        else if (pid<0){
+            perror("Fork error");
+            return 5;
+        } 
+        else 
+            wait(NULL); 
+    }
     while (wait(NULL)!=-1);
     for (b=0;b<a;b++){
         free(mas[b]);
