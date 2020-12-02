@@ -16,7 +16,7 @@ void directory(void)
     if (getcwd(buf,PATH_MAX)!=NULL)
         printf("\33[33m%s$\33[0m ",buf);
     else 
-        perror("Ошибка в getcwd");
+        perror("Ошибка в getcwd\n");
 }
 
 void ChangeInOut(char **words, int j)
@@ -27,12 +27,12 @@ void ChangeInOut(char **words, int j)
         if (flag==0){
             if (strcmp(words[i],">")==0){
                 if (words[i+1]==NULL){
-                    fprintf(stderr,"Ошибка в перенаправлении");
+                    fprintf(stderr,"Ошибка в перенаправлении\n");
                     break;
                 }
                 int fd=open(words[i+1],O_WRONLY | O_CREAT | O_TRUNC,0666);
                 if (fd<0){
-                    fprintf(stderr,"Ошибка при открытии/создании файла");
+                    fprintf(stderr,"Ошибка при открытии/создании файла\n");
                     break;
                 } 
                 dup2(fd,STDOUT_FILENO);
@@ -41,12 +41,12 @@ void ChangeInOut(char **words, int j)
             }
             else if (strcmp(words[i],"<")==0){
                 if (words[i+1]==NULL){
-                    fprintf(stderr,"Ошибка в перенаправлении");
+                    fprintf(stderr,"Ошибка в перенаправлении\n");
                     break;
                 }
                 int fd=open(words[i+1], O_RDONLY,0);
                 if (fd<0){
-                    fprintf(stderr,"Ошибка при открытии/создании файла");
+                    fprintf(stderr,"Ошибка при открытии/создании файла\n");
                     break;
                 }
                 dup2(fd,STDIN_FILENO);
@@ -55,17 +55,17 @@ void ChangeInOut(char **words, int j)
             } 
             else if (strcmp(words[i],">>")==0){
                 if (words[i+1]==NULL){
-                    fprintf(stderr,"Ошибка в перенаправлении");
+                    fprintf(stderr,"Ошибка в перенаправлении\n");
                     break;
                 }
                 int fd=open(words[i+1], O_WRONLY | O_CREAT | O_APPEND,0666);  
-                    if (fd<0){
-                        fprintf(stderr,"Ошибка при открытии/создании файла");
-                        break;
-                    }
-                    dup2(fd,STDOUT_FILENO);
-                    close(fd);
-                    flag=1;          
+                if (fd<0){
+                    fprintf(stderr,"Ошибка при открытии/создании файла\n");
+                    break;
+                }
+                dup2(fd,STDOUT_FILENO);
+                close(fd);
+                flag=1;          
             } 
         }
         if (flag==1){
@@ -96,7 +96,7 @@ int processing(char **words,int j)
                 free(home);
             }  
             else if (chdir(words[1])==-1)
-                perror("No such directory"); 
+                perror("No such directory\n"); 
         }
         else{
             /*Создание нoвого процесса, вызов программы*/
@@ -104,11 +104,11 @@ int processing(char **words,int j)
                 /*перед execvp если есть > or >> or < то перенаправление вывода, ввода */
                 ChangeInOut(words,j);
                 execvp(words[0],words);
-                perror("Execvp error");
+                perror("Execvp error\n");
                 return 1;
             }
             else if (pid<0){
-                perror("Fork's mistake");
+                perror("Fork's mistake\n");
                 return 3;
             }
             else 
@@ -129,7 +129,7 @@ int PipeN(char **words,int j)
             mas=realloc(mas,sizeof(char**)*(a+1));
             mas[a]=NULL;
             if (pipe(fd)<0){
-                perror("Pipe's error");
+                perror("Pipe's error\n");
                 exit(1);
             }      
             if ((pid=fork())==0){
@@ -138,11 +138,16 @@ int PipeN(char **words,int j)
                 close(fd[0]);
                 close(fd[1]);
                 execvp(mas[0],mas);
-                perror("Execvp error");
+                perror("Execvp error\n");
+                for (b=0;b<a;b++){
+                    free(mas[b]);
+                    mas[b]=NULL;
+                } 
+                free(mas);
                 return 4;    
             }
             else if (pid<0){
-                perror("Fork error");
+                perror("Fork error\n");
                 return 5;
             }  
             dup2(fd[0],0);
@@ -172,11 +177,16 @@ int PipeN(char **words,int j)
             mas=realloc(mas,sizeof(char**)*(a+1));
             mas[a]=NULL;
             execvp(mas[0],mas);
-            perror("Execvp error");
+            perror("Execvp error\n");
+            for (b=0;b<a;b++){
+                free(mas[b]);
+                mas[b]=NULL;
+            } 
+            free(mas);
             return 4;    
         }
         else if (pid<0){
-            perror("Fork error");
+            perror("Fork error\n");
             return 5;
         } 
         else 
@@ -197,7 +207,7 @@ int main()
     char *w=NULL;
     char *home=NULL;
     char c;
-    int prob=0,kav=0,i=0,j=0,stat,size=1,vvod=0,a,conv=0;
+    int prob=0,kav=0,i=0,j=0,stat,size=1,vvod=0,a,conv=0,pid;
 
     directory();   
     while ((c=getchar())!=EOF){
@@ -225,7 +235,7 @@ int main()
                     conv=1;    
             }
             if (conv==1){
-                if (fork()==0){
+                if ((pid=fork())==0){
                     PipeN(words,j);
                     for (i=0;i<j;i++){
                         free(words[i]);
@@ -236,8 +246,12 @@ int main()
                     i=0;
                     return 0;
                 }
-                else 
+                else if (pid>0)
                     wait(NULL);
+                else {
+                    perror("Fork's error\n");
+                    return 1;
+                }
                 conv=0;
                 stat=0;
             }
@@ -259,8 +273,9 @@ int main()
                 return 2;
             directory();
             prob=0;
+            vvod=0;
         }
-        else if ((isspace(c)||(c=='>')||(c=='<')||(c=='|')) && kav==0){
+        else if ((isspace(c)||(c=='>')||(c=='<')||(c=='|')||(c=='&')) && kav==0){
             if (prob==0){
                 /*добавление слова в массив*/
                 if (w!=NULL){
@@ -278,7 +293,7 @@ int main()
                     size=1;
                 }   
             }
-            if ((c=='<')||(c=='|')){
+            if ((c=='<')||(c=='|')||(c=='&')){
             /*обработка и добавление < или |*/
                 if ((i+1)==size){
                     size=size*2+1;
