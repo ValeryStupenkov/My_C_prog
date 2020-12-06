@@ -9,6 +9,9 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <wait.h>
+#include <signal.h>
+
+int fon=0;
 
 void directory(void)
 {
@@ -81,10 +84,22 @@ void ChangeInOut(char **words, int j)
     return;   
 }
 
+void fonproc()
+{
+    int status,pid;
+    pid=waitpid(-1,&status,WNOHANG);
+    if (WIFEXITED(status)!=0 && pid>0){
+        if (WIFSIGNALED(status)){
+            printf("Фоновый процесс %d завершился по сигналу %d\n",pid,WTERMSIG(status));
+        }
+        else 
+            printf("Фоновый процесс %d завершился с кодом %d\n",pid,WEXITSTATUS(status));
+    }
+}
 int processing(char **words,int j)
 {
     char *home=NULL;
-    int i,a,pid;
+    int i,a,pid,status;
     if (words!=NULL){
         if (strcmp(words[0],"exit")==0)
             return 2;
@@ -104,15 +119,22 @@ int processing(char **words,int j)
                 /*перед execvp если есть > or >> or < то перенаправление вывода, ввода */
                 ChangeInOut(words,j);
                 execvp(words[0],words);
-                perror("Execvp error\n");
+                perror("Execvp error ");
                 return 1;
             }
             else if (pid<0){
-                perror("Fork's mistake\n");
+                perror("Fork's mistake ");
                 return 3;
             }
-            else 
-                wait(0); 
+            else{ 
+                if (fon==0)
+                    waitpid(pid,&status,0);
+                else{
+                    printf("Запущен фоновый процесс %d\n",pid); 
+                    fonproc();
+                    fon=0;
+                } 
+            }
         }            
     }
     return 0;
@@ -120,7 +142,7 @@ int processing(char **words,int j)
 
 int PipeN(char **words,int j)
 {
-    int fd[2],i=0,a=0,b=0,pid;
+    int fd[2],i=0,a=0,b=0,pid,status;
     char **mas=NULL;
     
     ChangeInOut(words,j);
@@ -177,7 +199,7 @@ int PipeN(char **words,int j)
             mas=realloc(mas,sizeof(char**)*(a+1));
             mas[a]=NULL;
             execvp(mas[0],mas);
-            perror("Execvp error\n");
+            perror("Execvp error");
             for (b=0;b<a;b++){
                 free(mas[b]);
                 mas[b]=NULL;
@@ -190,7 +212,7 @@ int PipeN(char **words,int j)
             return 5;
         } 
         else 
-            wait(NULL); 
+            waitpid(pid,&status,0); 
     }
     while (wait(NULL)!=-1);
     for (b=0;b<a;b++){
@@ -207,8 +229,9 @@ int main()
     char *w=NULL;
     char *home=NULL;
     char c;
-    int prob=0,kav=0,i=0,j=0,stat,size=1,vvod=0,a,conv=0,pid;
-
+    int prob=0,kav=0,i=0,j=0,stat,size=1,vvod=0,a,conv=0,pid,status;
+    
+    signal(SIGINT,SIG_IGN);
     directory();   
     while ((c=getchar())!=EOF){
         if (c=='\n' && kav==0){ /*запись последнего слова в массив, вызов обработки строки*/
@@ -226,51 +249,74 @@ int main()
                 i=0;
                 size=1;
             }
-            words=realloc(words,sizeof(char**)*(j+1));
-            words[j]=NULL;  
-            j++;
-            
-            for (a=0;a<j-1;a++){
-                if (strcmp(words[a],"|")==0)
-                    conv=1;    
-            }
-            if (conv==1){
-                if ((pid=fork())==0){
-                    PipeN(words,j);
-                    for (i=0;i<j;i++){
-                        free(words[i]);
-                        words[i]=NULL;
+            if (words!=NULL){
+                words=realloc(words,sizeof(char**)*(j+1));
+                words[j]=NULL;  
+                j++;            
+                for (a=0;a<j-1;a++){
+                    if ((strcmp(words[a],"&")==0)&&(a!=j-2)){
+                        fprintf(stderr,"Ошибка! & стоит не в конце строки!");
+                        fon=0;
+                        break;
+                    } 
+                    else if (strcmp(words[a],"&")==0){
+                        fon=1;
+                        free(words[a]);
+                        words[a]=NULL;
+                        j--;
+                    }       
+                }
+                for (a=0;a<j-1;a++){
+                    if (strcmp(words[a],"|")==0)
+                        conv=1;    
+                }
+                if (conv==1){
+                    if ((pid=fork())==0){
+                        PipeN(words,j);
+                        for (i=0;i<j;i++){
+                            free(words[i]);
+                            words[i]=NULL;
+                        }
+                        free(words);
+                        words=NULL;
+                        i=0;
+                        return 0;
                     }
-                    free(words);
-                    words=NULL;
-                    i=0;
-                    return 0;
+                    else if (pid>0){
+                        if  (fon==0) 
+                            waitpid(pid,&status,0);
+                        else{
+                            printf("Запущен фоновый процесс %d\n",pid);
+                            fonproc();
+                            fon=0;
+                        }
+                    }
+                    else {
+                        perror("Fork's error ");
+                        return 1;
+                    }
+                    conv=0;
+                    stat=0;
                 }
-                else if (pid>0)
-                    wait(NULL);
-                else {
-                    perror("Fork's error\n");
+                else
+                    stat=processing(words,j);
+                for (i=0;i<j;i++){
+                    free(words[i]);
+                    words[i]=NULL;
+                }
+                i=0;
+                free(words);
+                words=NULL;
+                j=0;
+                if (stat==1)
                     return 1;
-                }
-                conv=0;
-                stat=0;
+                else if (stat==2)
+                    return 0;
+                else if (stat==3)
+                    return 2;
             }
-            else
-                stat=processing(words,j);
-            for (i=0;i<j;i++){
-                free(words[i]);
-                words[i]=NULL;
-            }
-            i=0;
-            free(words);
-            words=NULL;
-            j=0;
-            if (stat==1)
-                return 1;
-            else if (stat==2)
-                return 0;
-            else if (stat==3)
-                return 2;
+            /*здесь проверка, завершился ли фоновый процесс, если да то обработка*/
+            fonproc();
             directory();
             prob=0;
             vvod=0;
