@@ -88,7 +88,7 @@ void fonproc()
 {
     int status,pid;
     pid=waitpid(-1,&status,WNOHANG);
-    if (WIFEXITED(status)!=0 && pid>0){
+    if (pid>0 && WIFEXITED(status)!=0){
         if (WIFSIGNALED(status)){
             printf("Фоновый процесс %d завершился по сигналу %d\n",pid,WTERMSIG(status));
         }
@@ -117,6 +117,9 @@ int processing(char **words,int j)
             /*Создание нoвого процесса, вызов программы*/
             if ((pid=fork())==0){
                 /*перед execvp если есть > or >> or < то перенаправление вывода, ввода */
+                if (!fon){
+                    signal(SIGINT,SIG_DFL);
+                }
                 ChangeInOut(words,j);
                 execvp(words[0],words);
                 perror("Execvp error ");
@@ -272,6 +275,9 @@ int main()
                 }
                 if (conv==1){
                     if ((pid=fork())==0){
+                        if (!fon){
+                            signal(SIGINT,SIG_DFL);
+                        }
                         PipeN(words,j);
                         for (i=0;i<j;i++){
                             free(words[i]);
