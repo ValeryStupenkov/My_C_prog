@@ -18,14 +18,19 @@ int main(int argc, char **argv)
             perror("Execlp error");
             return 1;
         }
-        else {
+        else if (pid>0) {
             waitpid(pid,&status,0);    
         }
+        else{ 
+            perror("Error");
+            return 1;
+        }
     }
+    dup2(fd[0],0);
+    close(fd[0]);
+    close(fd[1]); 
     if ((pid=fork())==0){
-        dup2(fd[0],0);
-        close(fd[0]);
-        close(fd[1]);
+        
         execlp(argv[3],argv[3],NULL);
         perror("Execlp error");
         return 1;    
@@ -35,9 +40,6 @@ int main(int argc, char **argv)
     }
     if (WIFEXITED(status)){
         if ((pid=fork())==0){
-            dup2(fd[0],0);
-            close(fd[0]);
-            close(fd[1]);
             execlp(argv[3],argv[3],NULL);
             perror("Execlp error");
             return 1;    
