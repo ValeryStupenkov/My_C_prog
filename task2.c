@@ -9,36 +9,36 @@
 
 int main(int argc, char **argv)
 {
-    int in=open("text.txt",O_RDONLY,0);
-    int out=open("text.txt",O_WRONLY | O_APPEND,0);
-    if (in<0 || out<0){
-        perror("Can't open file");
-        return 1;
-    }
-    char buf[1024];
+    int fd=open(argv[1], O_RDWR,0777);
+    char c;
     char *p;
-    int i=0,kol=0,a=0,n,nw;
-    while ((n=read(in,buf,1024))!=0){
-        p=buf;
-        while (p[i]!=EOF){
-            if (p[i]=='\n'){
-                if (kol==2){
-                    nw=write(out,p,i);  
-                    p=p+nw;
-                    n=n-nw;  
-                }
-                a=a+i;
-                i=0;
-                kol=0;
+    int i=0,kol=0,a=0,str=0,n=0;
+    while ((n=read(fd,&c,1))!=0){
+        i++;
+        str++;
+        if (c=='\n'){
+            if (kol==2){
+                i=i-str;
+			    while(read(fd, &c, 1)){
+				    lseek(fd, i+a, SEEK_SET);
+				    write(fd, &c, 1);
+				    lseek(fd, i+str+a, SEEK_SET);
+				    a++;
+			    }
+            a=0;
+			lseek(fd, i+str, SEEK_SET);    
             }
-            if (ispunct(p[i])){
+            kol=0;
+            str=0;
+        }
+        if (c!='\n'){
+            if (isdigit(c)){
                 kol++;
             }
             i++;    
         }
     }
-    ftruncate(out,a);
-    close(in); 
-    close(out);
+    ftruncate(fd,i);
+    close(fd);
     return 0;                
 }
