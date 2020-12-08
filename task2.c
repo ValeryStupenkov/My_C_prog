@@ -9,39 +9,42 @@
 
 int main(int argc, char **argv)
 {
-    int fd=open(argv[1], O_RDWR,0777);
-    if (fd<0){
+    int fd1=open(argv[1], O_RDONLY,0);
+    int fd2=open(argv[1], O_WRONLY,0);
+    if (fd1<0||fd2<0){
         perror("No file");
         exit(1);   
     }   
     char c;
     char *p;
-    int i=0,kol=0,a=0,str=1,n=0,end=0;
-    while ((n=read(fd,&c,1))!=0){
+    int i=0,kol=0,a=0,str=0,n=0,end=0,size=0,endfile;
+    while ((n=read(fd1,&c,1))>0){ 
         if (c=='\n'){
-            str++;
+            i++;
             if (kol==2){
-                i=i-str;
-                lseek(fd, end, SEEK_SET);
-			    while(read(fd, &c, 1) && a!=i){
-				    write(fd, &c, 1);
+                lseek(fd1, end, SEEK_SET);
+                a=end;
+			    while(read(fd1, &c, 1) && a!=i){
+				    write(fd2, &c, 1);
 				    a++;
+                    size++;
 			    }
             a=0;
-			lseek(fd, i+str, SEEK_SET);    
+			lseek(fd1, i, SEEK_SET);    
             }
             kol=0;
             str=0;
-            end=1;
+            end=i;
         }
-        if (c!='\n'){
+        else if (c!='\n'){
             if (isdigit(c)){
                 kol++;
             }
             i++;    
-        }
-    }
-    ftruncate(fd,i);
-    close(fd);
+        }   
+    }   
+    close(fd1);
+    ftruncate(fd2,size);
+    close(fd2);
     return 0;                
 }
