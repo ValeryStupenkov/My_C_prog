@@ -11,7 +11,7 @@
 #include <wait.h>
 #include <signal.h>
 
-int fon=0;
+int conv=0,fon=0;
 
 void directory(void)
 {
@@ -95,52 +95,6 @@ void fonproc()
         else 
             printf("Фоновый процесс %d завершился с кодом %d\n",pid,WEXITSTATUS(status));
     }
-}
-int processing(char **words,int j)
-{
-    char *home=NULL;
-    int i,a,pid,status;
-    if (words!=NULL){
-        if (strcmp(words[0],"exit")==0)
-            return 2;
-        else if (strcmp(words[0],"cd")==0){
-            /*обработка команды cd*/
-            if (words[1]==NULL){
-                home=strdup(getenv("HOME"));
-                chdir(home);
-                free(home);
-            }  
-            else if (chdir(words[1])==-1)
-                perror("No such directory\n"); 
-        }
-        else{
-            /*Создание нoвого процесса, вызов программы*/
-            if ((pid=fork())==0){
-                /*перед execvp если есть > or >> or < то перенаправление вывода, ввода */
-                if (!fon){
-                    signal(SIGINT,SIG_DFL);
-                }
-                ChangeInOut(words,j);
-                execvp(words[0],words);
-                perror("Execvp error ");
-                return 1;
-            }
-            else if (pid<0){
-                perror("Fork's mistake ");
-                return 3;
-            }
-            else{ 
-                if (fon==0)
-                    waitpid(pid,&status,0);
-                else{
-                    printf("Запущен фоновый процесс %d\n",pid); 
-                    fonproc();
-                    fon=0;
-                } 
-            }
-        }            
-    }
-    return 0;
 }
 
 int PipeN(char **words,int j)
@@ -226,13 +180,85 @@ int PipeN(char **words,int j)
     return 0;        
 }
 
+
+int processing(char **words,int j)
+{
+    char *home=NULL;
+    int i,a,pid,status,stat=0;
+    if (words!=NULL){
+        if (strcmp(words[0],"exit")==0)
+            return 2;
+        else if (strcmp(words[0],"cd")==0){
+            /*обработка команды cd*/
+            if (words[1]==NULL){
+                home=strdup(getenv("HOME"));
+                chdir(home);
+                free(home);
+            }  
+            else if (chdir(words[1])==-1)
+                perror("No such directory\n"); 
+        }
+        else if (conv==1){
+            if ((pid=fork())==0){
+                if (!fon){
+                    signal(SIGINT,SIG_DFL);
+                }
+                stat=PipeN(words,j);
+                return 2;
+            }
+            else if (pid>0){
+                if  (fon==0) 
+                    waitpid(pid,&status,0);
+                else{
+                    printf("Запущен фоновый процесс %d\n",pid);
+                    fonproc();
+                    fon=0;
+                }
+            }
+            else {
+                perror("Fork's error ");
+                return 1;
+            }
+            conv=0;
+        }
+        else{
+            /*Создание нoвого процесса, вызов программы*/
+            if ((pid=fork())==0){
+                /*перед execvp если есть > or >> or < то перенаправление вывода, ввода */
+                if (!fon){
+                    signal(SIGINT,SIG_DFL);
+                }
+                ChangeInOut(words,j);
+                execvp(words[0],words);
+                perror("Execvp error ");
+                return 1;
+            }
+            else if (pid<0){
+                perror("Fork's mistake ");
+                return 3;
+            }
+            else{ 
+                if (fon==0)
+                    waitpid(pid,&status,0);
+                else{
+                    printf("Запущен фоновый процесс %d\n",pid); 
+                    fonproc();
+                    fon=0;
+                } 
+            }
+        }            
+    }
+    return 0;
+}
+
+
 int main()
 {
     char **words=NULL;
     char *w=NULL;
     char *home=NULL;
     char c;
-    int prob=0,kav=0,i=0,j=0,stat,size=1,vvod=0,a,conv=0,pid,status;
+    int prob=0,kav=0,i=0,j=0,stat,size=1,vvod=0,a,pid,status;
     
     signal(SIGINT,SIG_IGN);
     directory();   
@@ -273,39 +299,7 @@ int main()
                     if (strcmp(words[a],"|")==0)
                         conv=1;    
                 }
-                if (conv==1){
-                    if ((pid=fork())==0){
-                        if (!fon){
-                            signal(SIGINT,SIG_DFL);
-                        }
-                        PipeN(words,j);
-                        for (i=0;i<j;i++){
-                            free(words[i]);
-                            words[i]=NULL;
-                        }
-                        free(words);
-                        words=NULL;
-                        i=0;
-                        return 0;
-                    }
-                    else if (pid>0){
-                        if  (fon==0) 
-                            waitpid(pid,&status,0);
-                        else{
-                            printf("Запущен фоновый процесс %d\n",pid);
-                            fonproc();
-                            fon=0;
-                        }
-                    }
-                    else {
-                        perror("Fork's error ");
-                        return 1;
-                    }
-                    conv=0;
-                    stat=0;
-                }
-                else
-                    stat=processing(words,j);
+                stat=processing(words,j);
                 for (i=0;i<j;i++){
                     free(words[i]);
                     words[i]=NULL;
