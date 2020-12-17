@@ -219,6 +219,7 @@ int processing(char **words,int j)
                     printf("Запущен фоновый процесс %d\n",pid);
                     fonproc();
                     fon=0;
+                    return 0;
                 }
             }
             else {
@@ -250,6 +251,7 @@ int processing(char **words,int j)
                     printf("Запущен фоновый процесс %d\n",pid); 
                     fonproc();
                     fon=0;
+                    return 0;
                 } 
             }
         }            
@@ -268,18 +270,18 @@ int executeorder(char **words,int j)
                 comand[a]=NULL;
                 a++;
                 status=processing(comand,a);
-                for (int b=0;b<a;b++){
-                    free(comand[b]);
-                    comand[b]=NULL;
-                }      
-                free(comand);
-                comand=NULL;
-                a=0;
-                if (status==-1)
-                    return -1;
-                else if (status==2)
-                    return 2;
             }
+            for (int b=0;b<a;b++){
+                free(comand[b]);
+                comand[b]=NULL;
+            }      
+            free(comand);
+            comand=NULL;
+            a=0;
+            if (status==-1)
+                return -1;
+            else if (status==2)
+                return 2;
             fsec=0;
             forsec=0;
             fandsec=0;
@@ -290,6 +292,7 @@ int executeorder(char **words,int j)
             else if (strcmp(words[i],"&&")==0)
                 fandsec=1;
             i++;
+            
         }
         else{
             comand=realloc(comand,sizeof(char**)*(a+1));
