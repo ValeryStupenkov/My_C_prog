@@ -11,7 +11,7 @@
 #include <wait.h>
 #include <signal.h>
 
-int conv=0,fon=0;
+int conv=0,fon=0,fsec=0,forsec=0,fandsec=0;
 
 void directory(void)
 {
@@ -186,17 +186,23 @@ int processing(char **words,int j)
     char *home=NULL;
     int i,a,pid,status,stat=0;
     if (words!=NULL){
+        for (a=0;a<j-1;a++){ /*установка флага конвеера*/
+            if (strcmp(words[a],"|")==0)
+                conv=1;    
+        }
         if (strcmp(words[0],"exit")==0)
-            return 2;
+            return -1;
         else if (strcmp(words[0],"cd")==0){
             /*обработка команды cd*/
             if (words[1]==NULL){
                 home=strdup(getenv("HOME"));
                 chdir(home);
                 free(home);
+                return 0;
             }  
             else if (chdir(words[1])==-1)
                 perror("No such directory\n"); 
+            return -1;
         }
         else if (conv==1){
             if ((pid=fork())==0){
@@ -204,7 +210,7 @@ int processing(char **words,int j)
                     signal(SIGINT,SIG_DFL);
                 }
                 stat=PipeN(words,j);
-                return 2;
+                return 10;
             }
             else if (pid>0){
                 if  (fon==0) 
@@ -217,7 +223,7 @@ int processing(char **words,int j)
             }
             else {
                 perror("Fork's error ");
-                return 1;
+                return -1;
             }
             conv=0;
         }
@@ -231,11 +237,11 @@ int processing(char **words,int j)
                 ChangeInOut(words,j);
                 execvp(words[0],words);
                 perror("Execvp error ");
-                return 1;
+                return -1;
             }
             else if (pid<0){
                 perror("Fork's mistake ");
-                return 3;
+                return -1;
             }
             else{ 
                 if (fon==0)
@@ -248,7 +254,79 @@ int processing(char **words,int j)
             }
         }            
     }
-    return 0;
+    return WEXITSTATUS(status);
+}
+
+int executeorder(char **words,int j)
+{
+    char **comand=NULL;
+    int i=0,a=0,status=0;
+    while (words[i]!=NULL){
+        if (strcmp(words[i],";")==0 || strcmp(words[i],"||")==0 || strcmp(words[i],"&&")==0){
+            if ((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0)){
+                comand=realloc(comand,sizeof(char**)*(a+1));
+                comand[a]=NULL;
+                a++;
+                status=processing(comand,a);
+                for (int b=0;b<a;b++){
+                    free(comand[b]);
+                    comand[b]=NULL;
+                }      
+                free(comand);
+                comand=NULL;
+                a=0;
+                if (status==-1)
+                    return -1;
+                else if (status==2)
+                    return 2;
+            }
+            fsec=0;
+            forsec=0;
+            fandsec=0;
+            if (strcmp(words[i],";")==0) 
+                fsec=1;
+            else if (strcmp(words[i],"||")==0)
+                forsec=1;
+            else if (strcmp(words[i],"&&")==0)
+                fandsec=1;
+            i++;
+        }
+        else{
+            comand=realloc(comand,sizeof(char**)*(a+1));
+            comand[a]=strdup(words[i]);
+            a++;
+            i++;      
+        }    
+    }
+    if ((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0)){
+        comand=realloc(comand,sizeof(char**)*(a+1));
+        comand[a]=NULL;
+        a++;
+        status=processing(comand,a);
+        for (int b=0;b<a;b++){
+            free(comand[b]);
+            comand[b]=0;
+        }      
+        free(comand);
+        comand=NULL;
+        a=0;
+        if (status==-1)
+            return -1;
+        else if (status==10)
+            return 10;
+    }
+    if (comand!=NULL){
+        for (int b=0;b<a;b++){
+            free(comand[b]);
+            comand[b]=0;
+        }
+        free(comand);
+        comand=NULL;    
+    }
+    fsec=0;
+    forsec=0;
+    fandsec=0;
+    return 0;        
 }
 
 
@@ -258,7 +336,7 @@ int main()
     char *w=NULL;
     char *home=NULL;
     char c;
-    int prob=0,kav=0,i=0,j=0,stat,size=1,vvod=0,a,pid,status;
+    int prob=0,kav=0,i=0,j=0,stat,size=1,vvod=0,vvod1=0,vvod2=0,a,pid,status;
     
     signal(SIGINT,SIG_IGN);
     directory();   
@@ -295,11 +373,7 @@ int main()
                         j--;
                     }       
                 }
-                for (a=0;a<j-1;a++){
-                    if (strcmp(words[a],"|")==0)
-                        conv=1;    
-                }
-                stat=processing(words,j);
+                stat=executeorder(words,j); /*вызов функции обработки строки*/
                 for (i=0;i<j;i++){
                     free(words[i]);
                     words[i]=NULL;
@@ -308,20 +382,20 @@ int main()
                 free(words);
                 words=NULL;
                 j=0;
-                if (stat==1)
+                if (stat==-1)
                     return 1;
-                else if (stat==2)
+                else if (stat==10)
                     return 0;
-                else if (stat==3)
-                    return 2;
             }
             /*здесь проверка, завершился ли фоновый процесс, если да то обработка*/
             fonproc();
             directory();
             prob=0;
             vvod=0;
+            vvod1=0;
+            vvod2=0;
         }
-        else if ((isspace(c)||(c=='>')||(c=='<')||(c=='|')||(c=='&')) && kav==0){
+        else if ((isspace(c)||(c=='>')||(c=='<')||(c=='|')||(c=='&')||(c==';')) && kav==0){
             if (prob==0){
                 /*добавление слова в массив*/
                 if (w!=NULL){
@@ -339,8 +413,8 @@ int main()
                     size=1;
                 }   
             }
-            if ((c=='<')||(c=='|')||(c=='&')){
-            /*обработка и добавление < или |*/
+            if ((c=='<')||(c==';')){
+            /*обработка и добавление < или ;*/
                 if ((i+1)==size){
                     size=size*2+1;
                     w=realloc(w,size);
@@ -363,11 +437,11 @@ int main()
                 free(w);
                 w=NULL;
                 i=0;
-                size=1;    
+                size=1;   
             }
-            else if (c=='>'){ 
-                    /*Обработка и добавление >*/
-                    if (vvod==0){
+            else if (c=='>'||c=='&'||c=='|'){ 
+                    /*Обработка и добавление >, & or |*/
+                    if ((vvod==0 && c=='>')||(vvod1==0 && c=='&')||(vvod2==0 && c=='|')){
                         if ((i+1)==size){
                             size=size*2+1;
                             w=realloc(w,size);
@@ -378,7 +452,12 @@ int main()
                         }
                         w[i]=c;
                         i++;
-                        vvod=1;
+                        if (c=='>')
+                            vvod=1;
+                        else if (c=='&')
+                            vvod1=1;
+                        else if (c=='|')
+                            vvod2=1;
                     }
                     else{
                         if ((i+1)==size){
@@ -391,7 +470,6 @@ int main()
                         }
                         w[i]=c;
                         i++;
-                        vvod=0;
                         words=realloc(words,sizeof(char**)*(j+1));
                         if (words==NULL){
                             fprintf(stderr,"Error\n");
@@ -404,7 +482,13 @@ int main()
                         free(w);
                         w=NULL;
                         i=0;
-                        size=1;    
+                        size=1;
+                        if (c=='>')
+                            vvod=0;
+                        else if (c=='&')
+                            vvod1=0;
+                        else if (c=='|')
+                            vvod2=0;    
                     }
             }
             prob=1;
@@ -415,7 +499,7 @@ int main()
                     kav=1;
                 else kav=0;
             }
-            if (vvod==1){
+            if (vvod==1 || vvod1==1 || vvod2==1){
                 words=realloc(words,sizeof(char**)*(j+1));
                 if (words==NULL){
                     fprintf(stderr,"Error\n");
@@ -437,7 +521,9 @@ int main()
                 w=NULL;
                 i=0;
                 size=1; 
-                vvod=0;  
+                vvod=0;
+                vvod1=0;
+                vvod2=0; 
             }
             /*добавление символов в слово*/    
             if ((i+1)==size){
