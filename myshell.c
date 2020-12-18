@@ -262,14 +262,39 @@ int processing(char **words,int j)
 int executeorder(char **words,int j)
 {
     char **comand=NULL;
-    int i=0,a=0,status=0;
+    int i=0,a=0,status=0,skob=0,other=0;
     while (words[i]!=NULL){
-        if (strcmp(words[i],";")==0 || strcmp(words[i],"||")==0 || strcmp(words[i],"&&")==0){
-            if ((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0)){
+        if (strcmp(words[i],"(")==0){
+            skob=1;       
+            i++;
+        }
+        else if (strcmp(words[i],")")==0){
+            if (skob==0){
+                fprintf(stderr,"Неправильное использование скобок\n");
+                for (int b=0;b<a;b++){
+                    free(comand[b]);
+                    comand[b]=NULL;
+                }      
+                free(comand);
+                return 0;
+            }
+            else {
+                skob=0;
+                other=1;    
+            }
+            i++;
+        }
+        else if ((strcmp(words[i],";")==0 || strcmp(words[i],"||")==0 || strcmp(words[i],"&&")==0) && skob==0){
+            if (((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0))&&a!=0){
                 comand=realloc(comand,sizeof(char**)*(a+1));
                 comand[a]=NULL;
                 a++;
-                status=processing(comand,a);
+                if (other==1){
+                    status=executeorder(comand,a);
+                    other=0;
+                }
+                else
+                    status=processing(comand,a);
             }
             for (int b=0;b<a;b++){
                 free(comand[b]);
@@ -280,8 +305,8 @@ int executeorder(char **words,int j)
             a=0;
             if (status==-1)
                 return -1;
-            else if (status==2)
-                return 2;
+            else if (status==10)
+                return 10;
             fsec=0;
             forsec=0;
             fandsec=0;
@@ -301,11 +326,16 @@ int executeorder(char **words,int j)
             i++;      
         }    
     }
-    if ((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0)){
+    if (((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0))&&a!=0){
         comand=realloc(comand,sizeof(char**)*(a+1));
         comand[a]=NULL;
         a++;
-        status=processing(comand,a);
+        if (other==1){
+            status=executeorder(comand,a);
+            other=0;
+        }
+        else 
+            status=processing(comand,a);
         for (int b=0;b<a;b++){
             free(comand[b]);
             comand[b]=0;
@@ -329,7 +359,7 @@ int executeorder(char **words,int j)
     fsec=0;
     forsec=0;
     fandsec=0;
-    return 0;        
+    return status;        
 }
 
 
@@ -398,7 +428,7 @@ int main()
             vvod1=0;
             vvod2=0;
         }
-        else if ((isspace(c)||(c=='>')||(c=='<')||(c=='|')||(c=='&')||(c==';')) && kav==0){
+        else if ((isspace(c)||c=='>'||c=='<'||c=='|'||c=='&'||c==';'||c=='('||c==')') && kav==0){ /*разделение на слова и разделительные символы*/
             if (prob==0){
                 /*добавление слова в массив*/
                 if (w!=NULL){
@@ -416,8 +446,8 @@ int main()
                     size=1;
                 }   
             }
-            if ((c=='<')||(c==';')){
-            /*обработка и добавление < или ;*/
+            if ((c=='<')||(c==';')||(c=='(')||(c==')')||(c=='`')){
+            /*обработка и добавление <,(,) или ;*/
                 if ((i+1)==size){
                     size=size*2+1;
                     w=realloc(w,size);
