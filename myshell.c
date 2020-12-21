@@ -263,10 +263,11 @@ int processing(char **words,int j) /*функция обработки кома�
 
 int Pipescob(char **words,int j){ /*обработка пайпа со скобками*/
     char **mas=NULL;
-    int fd[2],i=0,pid,status=0,a=0,stat=0,skob=0,noconv=0;
+    int fd[2],i=0,pid,status=0,a=0,stat=0,skob=0,noconv=0,inconv=0,std;
+    std=dup(0);
     while (words[i]!=NULL){
         if (strcmp(words[i],"|")==0 && skob==0){
-            if (((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0))&&a!=0){
+            if (((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0))&&a!=0&&noconv==0){
                 mas=realloc(mas,sizeof(char**)*(a+1));
                 mas[a]=NULL;
                 fsec=0;
@@ -303,7 +304,7 @@ int Pipescob(char **words,int j){ /*обработка пайпа со скоб�
                     free(mas);
                     mas=NULL;
                     a=0;
-                    i++;   
+                    i++; 
                 }
             }
             else {
@@ -323,6 +324,7 @@ int Pipescob(char **words,int j){ /*обработка пайпа со скоб�
         }   
         else if ((strcmp(words[i],";")==0 || strcmp(words[i],"||")==0 || strcmp(words[i],"&&")==0) && skob==0){
             if (((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0))&&a!=0){
+                
                 mas=realloc(mas,sizeof(char**)*(a+1));
                 mas[a]=NULL;
                 a++;
@@ -344,7 +346,9 @@ int Pipescob(char **words,int j){ /*обработка пайпа со скоб�
                 else if (strcmp(words[i],"&&")==0)
                     fandsec=1;
                 i++;
-            }    
+            }  
+            dup2(std,0);
+            noconv=0;  
         }
         else{ 
             if (strcmp(words[i],"(")==0)
@@ -384,6 +388,7 @@ int Pipescob(char **words,int j){ /*обработка пайпа со скоб�
         mas[b]=NULL;
     }
     free(mas);
+    close(std);
     return 0;
 }
 
