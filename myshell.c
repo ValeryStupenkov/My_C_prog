@@ -263,46 +263,62 @@ int processing(char **words,int j) /*функция обработки кома�
 
 int Pipescob(char **words,int j){ /*обработка пайпа со скобками*/
     char **mas=NULL;
-    int fd[2],i=0,pid,status=0,a=0,stat=0,skob=0;
+    int fd[2],i=0,pid,status=0,a=0,stat=0,skob=0,noconv=0;
     while (words[i]!=NULL){
-        if (strcmp(words[i],"|")==0 && skob==0 && (((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0))&&a!=0)){
-            mas=realloc(mas,sizeof(char**)*(a+1));
-            mas[a]=NULL;
-            fsec=0;
-            forsec=0;
-            fandsec=0;
-            if (pipe(fd)<0){
-                perror("Pipe error\n");
-                return -1;
-            }
-            if ((pid=fork())==0){
-                if ((i+1)!=j)
-                    dup2(fd[1],1);
-                close(fd[0]);
-                close(fd[1]);
-                status=executeorder(mas,a);
-                for (int b=0;b<a;b++){
-                    free(mas[b]);
-                    mas[b]=NULL;
+        if (strcmp(words[i],"|")==0 && skob==0){
+            if (((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0))&&a!=0){
+                mas=realloc(mas,sizeof(char**)*(a+1));
+                mas[a]=NULL;
+                fsec=0;
+                forsec=0;
+                fandsec=0;
+                if (pipe(fd)<0){
+                    perror("Pipe error\n");
+                    return -1;
                 }
-                free(mas);
-                mas=NULL;
-                return -1;
+                if ((pid=fork())==0){
+                    if ((i+1)!=j)
+                        dup2(fd[1],1);
+                    close(fd[0]);
+                    close(fd[1]);
+                    status=executeorder(mas,a);
+                    for (int b=0;b<a;b++){
+                        free(mas[b]);
+                        mas[b]=NULL;
+                    }
+                    free(mas);
+                    mas=NULL;
+                    return -1;
+                }
+                else if (pid<0)
+                    return -1;
+                else {
+                    dup2(fd[0],0);
+                    close(fd[0]);
+                    close(fd[1]);
+                    for (int b=0;b<a;b++){
+                        free(mas[b]);
+                        mas[b]=NULL;
+                    }
+                    free(mas);
+                    mas=NULL;
+                    a=0;
+                    i++;   
+                }
             }
-            else if (pid<0)
-                return -1;
             else {
-                dup2(fd[0],0);
-                close(fd[0]);
-                close(fd[1]);
                 for (int b=0;b<a;b++){
-                    free(mas[b]);
-                    mas[b]=NULL;
-                }
+                        free(mas[b]);
+                        mas[b]=NULL;
+                    }
                 free(mas);
                 mas=NULL;
                 a=0;
-                i++;   
+                i++;  
+                fsec=0;
+                forsec=0;
+                fandsec=0;  
+                noconv=1;      
             }
         }   
         else if ((strcmp(words[i],";")==0 || strcmp(words[i],"||")==0 || strcmp(words[i],"&&")==0) && skob==0){
@@ -343,7 +359,7 @@ int Pipescob(char **words,int j){ /*обработка пайпа со скоб�
     }
     if (mas==NULL)
         fprintf(stderr,"Error\n");
-    else{
+    else if (noconv==0){
         if ((pid=fork())==0){
             mas=realloc(mas,sizeof(char**)*(a+1));
             mas[a]=NULL;
