@@ -261,13 +261,16 @@ int processing(char **words,int j) /*функция обработки кома�
     return WEXITSTATUS(status);
 }
 
-int Pipescob(char **words,int j){
+int Pipescob(char **words,int j){ /*обработка пайпа со скобками*/
     char **mas=NULL;
     int fd[2],i=0,pid,status=0,a=0,stat=0,skob=0;
     while (words[i]!=NULL){
-        if (strcmp(words[i],"|")==0 && skob==0){
+        if (strcmp(words[i],"|")==0 && skob==0 && (((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0))&&a!=0)){
             mas=realloc(mas,sizeof(char**)*(a+1));
             mas[a]=NULL;
+            fsec=0;
+            forsec=0;
+            fandsec=0;
             if (pipe(fd)<0){
                 perror("Pipe error\n");
                 return -1;
@@ -299,10 +302,35 @@ int Pipescob(char **words,int j){
                 free(mas);
                 mas=NULL;
                 a=0;
-                i++;
+                i++;   
             }
+        }   
+        else if ((strcmp(words[i],";")==0 || strcmp(words[i],"||")==0 || strcmp(words[i],"&&")==0) && skob==0){
+            if (((fsec==0 && forsec==0 && fandsec==0) || (fsec==1) || (forsec==1 && status!=0) || (fandsec==1 && status==0))&&a!=0){
+                mas=realloc(mas,sizeof(char**)*(a+1));
+                mas[a]=NULL;
+                a++;
+                fsec=0;
+                forsec=0;
+                fandsec=0;
+                status=executeorder(mas,a);
+                for (int b=0;b<a;b++){
+                    free(mas[b]);
+                    mas[b]=NULL;
+                }
+                free(mas);
+                mas=NULL;
+                a=0;
+                if (strcmp(words[i],";")==0) 
+                    fsec=1;
+                else if (strcmp(words[i],"||")==0)
+                    forsec=1;
+                else if (strcmp(words[i],"&&")==0)
+                    fandsec=1;
+                i++;
+            }    
         }
-        else{ /*преобразовать добавление в мас так, чтобы то что внутри скобок было одной командой*/
+        else{ 
             if (strcmp(words[i],"(")==0)
                 skob=1;
             else if (strcmp(words[i],")")==0)
