@@ -97,6 +97,7 @@ public:
             }  
         }
         n--;   
+        cout<<"Выполнено успешно!"<<endl;
     }
         
     SubjPointer *findsubj(const char *word){    // поиск элемента в списке по слову
@@ -111,7 +112,7 @@ public:
         return NULL;
     }
 
-    int getlength(){ return n;}
+    int getlength(){ return n;}    // получение длины списка
     
     friend ostream &operator<<(ostream &str, List &ls){   // вывод на экран всех элементов списка
         SubjPointer *tmp=NULL;
@@ -122,14 +123,13 @@ public:
             for (int i=0;i<count;i++){
                 if (tmp->num[i]>0)
                     str<<tmp->num[i]<<" ";
-                str<<endl;
             }
         }
         str<<endl;
         return str; 
     }
 
-    void loadfile(const char* filename){
+    void loadfile(const char* filename){    // ввод указателя из файла
         char word[50];
         int i,tmp=0,num[count];
         fstream fd;   
@@ -148,9 +148,10 @@ public:
                 addsubj(word,num);
         }
         fd.close();
+        cout<<"Выполнено успешно!"<<endl;
     }
     
-    int *getnum(const char *word){
+    int *getnum(const char *word){   // получение номера слова в списке
         SubjPointer *tmp=NULL;
         if ((tmp=findsubj(word))==NULL){
             cerr<<"Этого слова в списке нет"<<endl;
@@ -159,7 +160,7 @@ public:
         return tmp->num;    
     }
 
-    void printnum(const char *word){
+    void printnum(const char *word){   // печать номеров страниц
         if (word==NULL){
             cerr<<"Error--empty word"<<endl;
             exit;
@@ -177,7 +178,7 @@ public:
         cout<<"\n";
     }
 
-    void entersubj(){
+    void entersubj(){     // ввод указателя с клавиатуры
         char word[50];
         int i,c=0,num[count];
         for (i=0;i<count;i++)
@@ -201,9 +202,8 @@ int main(){
     int i,b;
     char filename[20];
     char word[50];
-    
+    cout<<"Приветствую! Выберите нужный вам вариант из списка: "<<endl;
     while(1){
-        cout<<"Приветствую! Выберите нужный вам вариант из списка: "<<endl;
         cout<<" 1 -- ввести указатель с клавитауры"<<endl;
         cout<<" 2 -- ввести указатель из файла"<<endl;
         cout<<" 3 -- вывести список указателей"<<endl;
