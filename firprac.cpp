@@ -233,9 +233,20 @@ public:
     }
 };
 
+bool isNumber(int & i,const string & s)
+{
+    try{
+        size_t pos; 
+        i=stoi(s,&pos);
+        return pos==s.size();   
+    }
+    catch (const invalid_argument&){ return false;}
+}
+
 int main(){
     SubjPointer l;
     string a;
+    bool isnum;
     int id,switcher_a;
     int pointid=-1;
     char filename[20];
@@ -256,7 +267,11 @@ int main(){
         if (a=="exit"){
             return 0;
         }
-        switcher_a=stoi(a);
+        isnum=isNumber(switcher_a,a);
+        if (!isnum){
+            cout<<"Такой опции нет)"<<endl;
+        }
+        else
         switch (switcher_a){
             case 1:
             {
