@@ -35,29 +35,47 @@ public:
         n=0;
     };
     void addsubj(const char *word, const int *pages){    // добавление элемента в список
-        int id=0;
+        int id=0,j;
+        bool found=0;
         Element *tmp=new Element();
+        Element *tmp2=head;
         if (n!=0){       // если в списке есть элементы
-            id=tail->index+1;
-            tmp->prev=tail;
-            tail->next=tmp;
-            tail=tmp;    
+            for (int i=0;i<n;i++){
+                if (tmp2==NULL)
+                    break;
+                if(!strcmp(word,tmp2->word)){
+                    for (j=0;j<count;j++){
+                        tmp2->num[j]=pages[j];
+                    }
+                    found=1;
+                }
+                else
+                    tmp2=tmp2->next;
+            }
+            if (!found){
+                id=tail->index+1;
+                tmp->prev=tail;
+                tail->next=tmp;
+                tail=tmp;
+            }    
         }
         else {
-            tmp->prev-NULL;
+            tmp->prev=NULL;
             head=tail=tmp;
         }
-        strcpy(tmp->word,word);
-        for (int i=0; i<count;i++)
-            tmp->num[i]=pages[i];
-        tmp->index=id;
-        tmp->next=NULL;
-        n++;
+        if (!found){
+            strcpy(tmp->word,word);
+            for (int i=0; i<count;i++)
+                tmp->num[i]=pages[i];
+            tmp->index=id;
+            tmp->next=NULL;
+            n++;
+        }
     }
 
     Element *getsubj(const int id){   // посик элемента в списке по индексу
-        if (id>n || id<0){
-            cerr<<"Error!"<<endl;
+        if (id>n || id<0 || n==0){
+            cerr<<"Такого элемента в списке нет"<<endl;
             return NULL;
         }    
         Element *tmp=head;
@@ -85,17 +103,18 @@ public:
             if (tmp->next!=NULL) {
                 tmp2=tmp->next;
                 tmp2->prev=tmp->prev;
+                while (tmp2!=NULL){
+                    tmp2->index--;
+                    tmp2=tmp2->next;
+                } 
             } 
             else
                 tail=tmp->prev;
-            delete tmp;
-            while (tmp2!=NULL){
-                tmp2->index--;
-                tmp2=tmp2->next;
-            }  
-        }
-        n--;   
-        cout<<"Выполнено успешно!"<<endl;
+            if (tmp!=NULL)
+                delete tmp;
+            n--;   
+            cout<<"Выполнено успешно!"<<endl;
+        }  
     }
         
     Element *findsubj(const char *word){    // поиск элемента в списке по слову
@@ -150,7 +169,7 @@ public:
         cout<<"Выполнено успешно!"<<endl;
     }
     
-    int *getnum(const char *word){   // получение номера слова в списке
+    int *getnum(const char *word){   // получение номеров страниц
         Element *tmp=NULL;
         if ((tmp=findsubj(word))==NULL){
             cerr<<"Этого слова в списке нет"<<endl;
@@ -162,12 +181,12 @@ public:
     void printnum(const char *word){   // печать номеров страниц
         if (word==NULL){
             cerr<<"Error--empty word"<<endl;
-            exit;
+            return;
         }
         int *tmp=NULL;
         if ((tmp=getnum(word))==NULL){
             cerr<<"Ошибка, слово не найдено"<<endl;
-            exit;
+            return;
         }
         cout<<word<<": ";
         for (int i=0;i<count;i++){
@@ -185,9 +204,15 @@ public:
                 num[i]=0;  
             cout<<"\nВведите слово: ";
             cin>>word;
-            cout<<"\nВведите количество страниц: ";
+            cout<<"\nВведите количество страниц: "<<endl;
             cin>>c;
-            cout<<"\nВведите номера страниц: ";
+            if (c>10){
+                cout<<"Максимальное количество страниц - 10!"<<endl;
+                c=10;
+            }
+            else if (c<0)
+                cout<<"Введите натуральное число!"<<endl;    
+            cout<<"Введите номера страниц: ";
             for (i=0;i<c;i++){
                 cin>>num[i];
             }
@@ -197,17 +222,27 @@ public:
             cin>>yn;              
        }
     } 
+    
+    int getindex(const char *word){
+        Element *tmp=NULL;
+        if ((tmp=findsubj(word))==NULL){
+            cerr<<"Этого слова в списке нет"<<endl;
+            return -1;
+        }
+        return tmp->index;    
+    }
 };
 
 int main(){
     SubjPointer l;
     string a;
     int id,switcher_a;
-    int *pointid;
+    int pointid=-1;
     char filename[20];
     char word[50];
     cout<<"Приветствую! Выберите нужный вам вариант из списка: "<<endl;
     while(1){
+        cout<<endl;
         cout<<" 1 -- ввести указатель с клавитауры"<<endl;
         cout<<" 2 -- ввести указатель из файла"<<endl;
         cout<<" 3 -- вывести список указателей"<<endl;
@@ -215,7 +250,9 @@ int main(){
         cout<<" 5 -- удалить элемент из указателя по индексу"<<endl;
         cout<<" 6 -- удалить элемент из указателя по слову"<<endl;
         cout<<" exit-- выход"<<endl;
+        cout<<"Выберите нужную опцию: ";
         cin>>a;
+        cout<<endl;
         if (a=="exit"){
             return 0;
         }
@@ -256,9 +293,14 @@ int main(){
             {
                 cout<<"Введите слово: ";
                 cin>>word;
-                pointid=l.getnum(word);
-                if (pointid!=NULL)
-                    l.delsubj(*pointid);
+                pointid=l.getindex(word);
+                if (pointid!=-1)
+                    l.delsubj(pointid);
+                break;
+            }
+            default:
+            {
+                cout<<"Такого пункта в меню нет)"<<endl;
                 break;
             }
         }
