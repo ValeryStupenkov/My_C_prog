@@ -5,30 +5,28 @@ using namespace std;
 
 const int count=10;
 
-class SubjPointer{
+class SubjPointer;
+
+class Element{     // предметный указатель
+    int index;      // номер слова в списке 
+    int num[count]; // номера страниц 
+    char word[50];  
+    Element *next;
+    Element *prev;
 public:
-    int index;
-    int num[count];
-    char word[50];
-    SubjPointer *next;
-    SubjPointer *prev;
-    SubjPointer(){index=0; next=prev=NULL;};
-    SubjPointer(char* w){strcpy(word,w); next=prev=NULL;};
-    SubjPointer(const SubjPointer &s){
-        strcpy(word,s.word);
-        for (int i=0; i<count; i++) 
-            num[i]=s.num[i];
-    };
+    Element(){index=0; next=prev=NULL;}
+    friend class SubjPointer;
+    friend ostream &operator<<(ostream &str, SubjPointer &ls);
 };
 
-class List{
-    SubjPointer *head; // указатель на начало списка
-    SubjPointer *tail; // указатель на конец списка
+class SubjPointer{        //список предметных указателей
+    Element *head; // указатель на начало списка
+    Element *tail; // указатель на конец списка
     int n;             // количество элементов в списке
 public:
-    List(){ head=tail=NULL; n=0;};  // конструктор 
-    ~List(){                        // деструктор
-        SubjPointer *tmp=NULL;
+    SubjPointer(){ head=tail=NULL; n=0;};  // конструктор 
+    ~SubjPointer(){                        // деструктор
+        Element *tmp=NULL;
         while (head!=NULL){
             tmp=head->next;
             delete head;
@@ -36,9 +34,9 @@ public:
         }
         n=0;
     };
-    void addsubj(const char * const word, const int * const pages){    // добавление элемента в список
+    void addsubj(const char *word, const int *pages){    // добавление элемента в список
         int id=0;
-        SubjPointer *tmp=new SubjPointer();
+        Element *tmp=new Element();
         if (n!=0){       // если в списке есть элементы
             id=tail->index+1;
             tmp->prev=tail;
@@ -57,12 +55,12 @@ public:
         n++;
     }
 
-    SubjPointer *getsubj(const int id){   // посик элемента в списке по индексу
+    Element *getsubj(const int id){   // посик элемента в списке по индексу
         if (id>n || id<0){
             cerr<<"Error!"<<endl;
             return NULL;
         }    
-        SubjPointer *tmp=head;
+        Element *tmp=head;
         while (tmp!=NULL){
             if (id==tmp->index)
                 return tmp;
@@ -73,8 +71,8 @@ public:
     }
     
     void delsubj(const int id){    // удаление элемента из списка
-        SubjPointer *tmp=NULL;
-        SubjPointer *tmp2=NULL;
+        Element *tmp=NULL;
+        Element *tmp2=NULL;
         int newids;
         if ((tmp=getsubj(id))!=NULL){
             if (tmp->prev!=NULL){
@@ -100,10 +98,10 @@ public:
         cout<<"Выполнено успешно!"<<endl;
     }
         
-    SubjPointer *findsubj(const char *word){    // поиск элемента в списке по слову
+    Element *findsubj(const char *word){    // поиск элемента в списке по слову
         if (word==NULL)
             return NULL;
-        SubjPointer *tmp=head;
+        Element *tmp=head;
         while (tmp!=NULL){
             if (!strcmp(word,tmp->word))
                 return tmp;
@@ -114,8 +112,8 @@ public:
 
     int getlength(){ return n;}    // получение длины списка
     
-    friend ostream &operator<<(ostream &str, List &ls){   // вывод на экран всех элементов списка
-        SubjPointer *tmp=NULL;
+    friend ostream &operator<<(ostream &str, SubjPointer &ls){   // вывод на экран всех элементов списка
+        Element *tmp=NULL;
         str<<"\n";
         for (int i=0;i<ls.getlength();i++){
             tmp=ls.getsubj(i);
@@ -124,6 +122,7 @@ public:
                 if (tmp->num[i]>0)
                     str<<tmp->num[i]<<" ";
             }
+            str<<endl;
         }
         str<<endl;
         return str; 
@@ -136,7 +135,7 @@ public:
         fd.open(filename,ios::in);
         if (!fd){
             cout<<"\nError loading\n";
-            exit;
+            return;
         }
         while (fd.good()){
             word[0]='\0';
@@ -152,7 +151,7 @@ public:
     }
     
     int *getnum(const char *word){   // получение номера слова в списке
-        SubjPointer *tmp=NULL;
+        Element *tmp=NULL;
         if ((tmp=findsubj(word))==NULL){
             cerr<<"Этого слова в списке нет"<<endl;
             return NULL;
@@ -172,34 +171,39 @@ public:
         }
         cout<<word<<": ";
         for (int i=0;i<count;i++){
-            if (tmp[i]>0);
+            if (tmp[i]>0)
                 cout<<tmp[i]<<" ";
         }
         cout<<"\n";
     }
 
     void entersubj(){     // ввод указателя с клавиатуры
-        char word[50];
+        char word[50],yn='y';
         int i,c=0,num[count];
-        for (i=0;i<count;i++)
-            num[i]=0;  
-        cout<<"Введите слово: ";
-        cin>>word;
-        cout<<"\nВведите количество страниц: ";
-        cin>>c;
-        cout<<"\nВведите номера страниц: ";
-        for (i=0;i<c;i++){
-            cin>>num[i];
-        }
-        addsubj(word,num);
-        cout<<"\nСлово успешно добавлено"<<endl;
+        while (yn=='y'){
+            for (i=0;i<count;i++)
+                num[i]=0;  
+            cout<<"\nВведите слово: ";
+            cin>>word;
+            cout<<"\nВведите количество страниц: ";
+            cin>>c;
+            cout<<"\nВведите номера страниц: ";
+            for (i=0;i<c;i++){
+                cin>>num[i];
+            }
+            addsubj(word,num);
+            cout<<"\nСлово успешно добавлено"<<endl;
+            cout<<"Продолжить ввод?-y/n ";
+            cin>>yn;              
+       }
     } 
 };
 
 int main(){
-    List l;
+    SubjPointer l;
     string a;
-    int i,b;
+    int id,switcher_a;
+    int *pointid;
     char filename[20];
     char word[50];
     cout<<"Приветствую! Выберите нужный вам вариант из списка: "<<endl;
@@ -208,14 +212,15 @@ int main(){
         cout<<" 2 -- ввести указатель из файла"<<endl;
         cout<<" 3 -- вывести список указателей"<<endl;
         cout<<" 4 -- вывести номера страниц для указанного слова"<<endl;
-        cout<<" 5 -- удалить элемент из указателя"<<endl;
+        cout<<" 5 -- удалить элемент из указателя по индексу"<<endl;
+        cout<<" 6 -- удалить элемент из указателя по слову"<<endl;
         cout<<" exit-- выход"<<endl;
         cin>>a;
         if (a=="exit"){
             return 0;
         }
-        b=stoi(a);
-        switch (b){
+        switcher_a=stoi(a);
+        switch (switcher_a){
             case 1:
             {
                 l.entersubj();
@@ -243,8 +248,17 @@ int main(){
             case 5:
             {
                 cout<<"Введите номер элемента в списке: ";
-                cin>>i;
-                l.delsubj(i);
+                cin>>id;
+                l.delsubj(id);
+                break;
+            }
+            case 6:
+            {
+                cout<<"Введите слово: ";
+                cin>>word;
+                pointid=l.getnum(word);
+                if (pointid!=NULL)
+                    l.delsubj(*pointid);
                 break;
             }
         }
