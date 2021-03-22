@@ -4,7 +4,7 @@
 
 using namespace std;                                
                                             //Абстрактный класс Person и его наследники: классы Student и Professor + подсчёт общего количества
-                                            //людей,студентов и преподавателей
+                                            //людей
 class Person{     
     static int kol;     // количество людей
     char *first_name;   // имя 
@@ -115,16 +115,12 @@ public:
         cout<<*this;
         ShowInf();            
     }
-    char& operator[](const int index){      // Операция индексации, но нужна ли она здесь?
-        return first_name[index];
-    }
-    static int Getkol(){return kol;}
-    static int Setkol(int a){kol=a; return kol;}
+    static int Getkol(){return kol;}    
     static int Addkol(){kol++; return kol;}
     static int Delkol(){kol--; return kol;}
     int GetYear() const { return year;}
-    char *GetFName() const {return first_name;}
-    char *GetLName() const {return last_name;}
+    const char *GetFName() const {return first_name;}
+    const char *GetLName() const {return last_name;}
       
 };
 
@@ -175,8 +171,10 @@ public:
         cout<<"Ведёт предмет: "<<subj<<endl;    
     }
     void CopyInf(const Professor &p){
-        if (subj!=NULL)
+        if (subj!=NULL){
             delete[] subj;
+            subj=NULL;
+        }
         size_s=strlen(p.subj)+1;
         subj=new char[size_s];
         strcpy(subj,p.subj);
@@ -199,7 +197,8 @@ public:
 int Person::kol=0;
 
 int main(){
-    int a,n;
+    char yn;
+    int a,n,k;
     string s;
     Student s1;
     Professor p1;
@@ -244,12 +243,12 @@ int main(){
             }
             case 4:
             {
-                cout<<"Количество объектов класса Person: "<<Person::Getkol();
+                cout<<"Количество объектов класса Person: "<<Person::Getkol()<<endl;
                 break;
             }
             case 5:
             {
-                return 0;    
+                return 0;
             }
             default:
             {
