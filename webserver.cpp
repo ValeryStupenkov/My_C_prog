@@ -16,8 +16,6 @@
 using namespace std;
 
 #define BUF 2048
-#define DEFPORT 1234
-#define QUEUE 5
 
 class Error{
     string str;
@@ -69,17 +67,20 @@ public:
         }
         return NULL;
     }
-    void Read (string& str){
+    void Read (string &s){
         char msg[BUF];
         int tmp=recv(Getsd(), msg, BUF, 0);
         if (tmp<0)
             throw Error("Recieve");
-        else
-            string str(msg);   
+        else{
+            s=msg; 
+        }   
+                          
     }
     void Write(const string& str){
         const char *msg=(char*)malloc(str.size());
         msg=str.c_str();
+        cout<<msg;
         int tmp=send(Getsd(), msg, str.length(),0);
         if (tmp<0)
             throw Error("Send");
@@ -93,7 +94,6 @@ public:
         int status=shutdown(Getsd(),2);
         if (status<0)
             throw Error("In shutdown");
-        close(Getsd());
         return status;
     }
 };
@@ -116,7 +116,7 @@ public:
     }
     int Accept(SocketAddress &Claddr){
         socklen_t len=Claddr.GetAddrlen();
-        int csd=accept(Getsd(), (struct sockaddr*) Claddr.GetAddr(), &len);
+        int csd=accept(Getsd(), NULL, NULL);
         if (csd<0) 
             throw Error("In accept");
         return csd;
@@ -260,10 +260,8 @@ public:
             HttpHeader content_type("Content-type", extension);
             header+=content_type.GetHeader()+"\n";
         }
-        
         answer+=header+"\n";
         csd.Write(answer);
-        
         if (fd>=0 && request.method=="GET"){
             char mas[BUF];
             int i;
@@ -285,22 +283,29 @@ public:
         ConnectedSocket cs(cd);
         for(;;){
             string request;
-            cs.Read(request);
+            try {cs.Read(request);}
+            catch(Error err){
+                cerr<<"Server Error "<<err.GetErr()<<endl;
+                cout<<strerror(errno)<<endl;    
+                exit(1);           
+            } 
+            cout<<request;
             if (request=="Disconnect"){
-                cerr<<"Client Disconnected"<<endl;
+                cout<<"Client Disconnected"<<endl;
                 exit1=1;
             }
             else if (request=="Close"){
-                cerr<<"Server closed"<<endl;
+                cout<<"Server closed"<<endl;
                 exit2=1;
             }
             else if (!request.empty()){
                 HttpRequest text(request);
-                cout<<text;
+                cout<<text<<endl;
                 HttpResponse response(text,cs);
+                exit1=1;
             }
             request.clear();
-            if (exit1||exit2){
+            if (exit1 || exit2){
                 cs.Shutdown();
                 break;
             }
@@ -312,13 +317,20 @@ public:
             server.Listen(queue);
         }
         catch(Error err){
-            cerr<<"Server Error "<<err.GetErr()<<endl;                
+            cerr<<"Server Error "<<err.GetErr()<<endl;
+            exit(2);                
         } 
         for(;;){
+            int cd;
             SocketAddress claddr;
-            int cd=server.Accept(claddr);
+            try{cd=server.Accept(claddr);}
+            catch(Error err){
+                cerr<<"Error: "<<err.GetErr()<<endl;
+                exit(1);
+            }
             if (cd==-1)
                 break;
+            cout<<"Client Accepted!"<<endl;
             ProcessConnection(cd,claddr);
             if (exit2) 
                 break;
@@ -330,7 +342,7 @@ public:
 int main()
 {
     try{
-        HttpServer server(DEFPORT,QUEUE);
+        HttpServer server(1234,5);
         server.ServerLoop();
     }
     catch(Error err){
