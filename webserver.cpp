@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <cstdio>
 #include <sys/stat.h>
+#include <vector>
 
 using namespace std;
 
@@ -78,12 +79,11 @@ public:
                           
     }
     void Write(const string& str){
-        const char *msg=(char*)malloc(str.size());
-        msg=str.c_str();
-        cout<<msg;
-        int tmp=send(Getsd(), msg, str.length(),0);
-        if (tmp<0)
+        vector<char> tmp(str.begin(),str.end());
+        int status=send(Getsd(), tmp.data(), tmp.size(),0);
+        if (status<0)
             throw Error("Send");
+        
     }
     void Write(char *c, int len){
         int tmp=send(Getsd(),c,len,0);
@@ -160,8 +160,9 @@ class HttpRequest{
     string version;
     string body;
     int syntaxerr;
+    int index;
 public:
-    HttpRequest(const string& request){
+    HttpRequest(const string& request) : method(), uri_way(), parameters(), version(), body(), syntaxerr(0), index(0){
         string tmp=request;
         int pos=tmp.find(" ");
         if (pos<0)
@@ -171,9 +172,11 @@ public:
             tmp.erase(0,pos+1);
         }
         pos=tmp.find(" ");
-        if (pos<0)
-            syntaxerr=1;
-        else{
+        if(tmp=="/ HTTP/1.1"){
+            uri_way="index.html";
+            tmp.erase(0,pos);
+        }
+        else if (pos>=0){
             string uri=tmp.substr(1,pos);
             int pos2=tmp.find("?");
             if (pos2!=-1){
@@ -193,16 +196,21 @@ public:
         else 
             tmp.erase(0,pos);
         pos=tmp.find("\n");
-        if (pos<0)
-            syntaxerr=1;
-        else{
+        if (pos>=0){
             version=tmp.substr(0,pos);
             tmp.erase(0,pos);
+        }
+        else {
+            version=tmp.substr(0);
+            tmp.erase(0);
         }
         body=tmp;
     } 
     friend ostream &operator<<(ostream &str, HttpRequest &r){
-        str<<r.method<<" "<<"/"<<r.uri_way<<"?"<<r.parameters<<" "<<"HTTP/"<<r.version;
+        if(!r.parameters.empty())
+            str<<"\n"<<r.method<<" "<<"/"<<r.uri_way<<"?"<<r.parameters<<" "<<"HTTP/"<<r.version;
+        else
+            str<<"\n"<<r.method<<" "<<"/"<<r.uri_way<<" "<<"HTTP/"<<r.version;
         return str;
     }  
     friend class HttpResponse;
@@ -214,7 +222,7 @@ class HttpResponse{
     string answer;
     string body;
 public:
-    HttpResponse(HttpRequest& request, ConnectedSocket &csd){
+    HttpResponse(HttpRequest& request, ConnectedSocket &csd) : header(), code(), answer(), body(){
         int fd=open(request.uri_way.c_str(),O_RDONLY);
         if (fd==-1){
             if (errno == EACCES)
@@ -230,20 +238,20 @@ public:
             if (stat(request.uri_way.c_str(),&result)==0){
                 time_t t1=result.st_mtime;
                 HttpHeader last_mod("Last-modified", asctime(localtime(&t1)));
-                header+=last_mod.GetHeader()+"\n";
+                header+=last_mod.GetHeader();
             }    
         }
         if (request.method!="GET"&&request.method!="HEAD"){
             code="501 Not Implemented";
             HttpHeader allow("Allow","GET,HEAD");
-            header=allow.GetHeader()+"\n"; 
+            header+=allow.GetHeader()+"\n"; 
         }
-        answer="HTTP/1.1";
+        answer="HTTP/1.1 ";
         answer+="Code: " + code+"\n";
         time_t t=time(0);
         HttpHeader date("Date",asctime(localtime(&t)));
-        header+=date.GetHeader()+"\n";
-        HttpHeader server("Server", "Model Http Server Stu");
+        header+=date.GetHeader();
+        HttpHeader server("Server", "Model Http Server Stupenkov");
         header+=server.GetHeader()+"\n";
         char c;
         int length=0;
@@ -261,15 +269,21 @@ public:
             header+=content_type.GetHeader()+"\n";
         }
         answer+=header+"\n";
-        csd.Write(answer);
         if (fd>=0 && request.method=="GET"){
             char mas[BUF];
             int i;
-            while((i=read(fd,mas,BUF))>0)
-                csd.Write(mas,i);
+            string s;
+            while((i=read(fd,mas,BUF))>0){
+                for (int j=0;j<i;j++)
+                    s+=string(1,mas[j]);
+                answer+=s;
+                s.clear();
+            }
         }
+        csd.Write(answer);
         close(fd);
     }
+    const string GetAnswer() const {return answer;}
 };
 
 class HttpServer{
@@ -281,15 +295,10 @@ public:
     HttpServer(int port, int n) : server(), servaddr("127.0.0.1",port), queue(n), exit1(0), exit2(0){}
     void ProcessConnection(int cd, const SocketAddress& claddr){
         ConnectedSocket cs(cd);
+        string request;
         for(;;){
-            string request;
-            try {cs.Read(request);}
-            catch(Error err){
-                cerr<<"Server Error "<<err.GetErr()<<endl;
-                cout<<strerror(errno)<<endl;    
-                exit(1);           
-            } 
-            cout<<request;
+            cs.Read(request); 
+            cout<<"Request: "<<request<<endl;
             if (request=="Disconnect"){
                 cout<<"Client Disconnected"<<endl;
                 exit1=1;
@@ -300,9 +309,8 @@ public:
             }
             else if (!request.empty()){
                 HttpRequest text(request);
-                cout<<text<<endl;
                 HttpResponse response(text,cs);
-                exit1=1;
+                cout<<response.GetAnswer();
             }
             request.clear();
             if (exit1 || exit2){
