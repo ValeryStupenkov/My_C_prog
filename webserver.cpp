@@ -70,11 +70,13 @@ public:
     }
     void Read (string &s){
         char msg[BUF];
+        memset(msg,0,BUF);
         int tmp=recv(Getsd(), msg, BUF, 0);
         if (tmp<0)
-            throw Error("Recieve");
+            cerr<<"No client"<<endl;
         else{
             s=msg; 
+            memset(msg,0,BUF);
         }   
                           
     }
@@ -253,26 +255,27 @@ public:
         header+=date.GetHeader();
         HttpHeader server("Server", "Model Http Server Stupenkov");
         header+=server.GetHeader()+"\n";
-        char c;
-        int length=0;
         if (fd>=0){
-            while(read(fd,&c,0))
+            char c;
+            int length=0;
+            while(read(fd,&c,1))
                 length++;
             lseek(fd,0,0);
+            HttpHeader content_len("Content-length",to_string(length));
+            header+=content_len.GetHeader()+"\n";
         }
-        HttpHeader content_len("Content-length",to_string(length));
-        header+=content_len.GetHeader()+"\n";
         int indx=request.uri_way.find('.');
         if (indx>=0){
             string extension=request.uri_way.substr(indx+1);
             HttpHeader content_type("Content-type", extension);
             header+=content_type.GetHeader()+"\n";
         }
-        answer+=header+"\n";
+        answer+=header;
         if (fd>=0 && request.method=="GET"){
             char mas[BUF];
             int i;
             string s;
+            answer+="File: ";
             while((i=read(fd,mas,BUF))>0){
                 for (int j=0;j<i;j++)
                     s+=string(1,mas[j]);
@@ -280,6 +283,7 @@ public:
                 s.clear();
             }
         }
+        answer+="\n\n";
         csd.Write(answer);
         close(fd);
     }
@@ -299,11 +303,13 @@ public:
         for(;;){
             cs.Read(request); 
             cout<<"Request: "<<request<<endl;
-            if (request=="Disconnect"){
+            int pos=request.find("\n");
+            string req=request.substr(0,pos);
+            if (req=="Disconnect"){
                 cout<<"Client Disconnected"<<endl;
                 exit1=1;
             }
-            else if (request=="Close"){
+            else if (req=="Close"){
                 cout<<"Server closed"<<endl;
                 exit2=1;
             }
@@ -331,6 +337,7 @@ public:
         for(;;){
             int cd;
             SocketAddress claddr;
+            cout<<"Waiting for connection...\n";
             try{cd=server.Accept(claddr);}
             catch(Error err){
                 cerr<<"Error: "<<err.GetErr()<<endl;
