@@ -17,6 +17,7 @@
 using namespace std;
 
 #define BUF 2048
+#define DEFPORT 1234
 
 class Error{
     string str;
@@ -117,7 +118,6 @@ public:
         }  
     }
     int Accept(SocketAddress &Claddr){
-        socklen_t len=Claddr.GetAddrlen();
         int csd=accept(Getsd(), NULL, NULL);
         if (csd<0) 
             throw Error("In accept");
@@ -149,7 +149,7 @@ public:
     }
     const string GetHeader() const{
         string tmp=name;
-        tmp+=":";
+        tmp+=": ";
         tmp+=value;
         return tmp;
     }
@@ -174,12 +174,13 @@ public:
             tmp.erase(0,pos+1);
         }
         pos=tmp.find(" ");
-        if(tmp=="/ HTTP/1.1"){
-            uri_way="index.html";
-            tmp.erase(0,pos);
-        }
-        else if (pos>=0){
+        if (pos>=0){
             string uri=tmp.substr(1,pos);
+            if (pos==1){
+                uri="index.html";    
+                uri_way=uri.substr(0,uri.size());
+            }
+            else{
             int pos2=tmp.find("?");
             if (pos2!=-1){
                 uri_way=uri.substr(0,pos2);
@@ -191,6 +192,7 @@ public:
                 parameters=" ";   
             }
             tmp.erase(0,pos+1);
+            }
         }
         pos=tmp.find("/");
         if (pos<0)
@@ -235,26 +237,21 @@ public:
                 code="404 Not Found";
         }
         else{
-            code="200 OK";
-            struct stat result;
-            if (stat(request.uri_way.c_str(),&result)==0){
-                time_t t1=result.st_mtime;
-                HttpHeader last_mod("Last-modified", asctime(localtime(&t1)));
-                header+=last_mod.GetHeader();
-            }    
+            code="200 OK"; 
         }
         if (request.method!="GET"&&request.method!="HEAD"){
             code="501 Not Implemented";
             HttpHeader allow("Allow","GET,HEAD");
             header+=allow.GetHeader()+"\n"; 
         }
-        answer="HTTP/1.1 ";
-        answer+="Code: " + code+"\n";
+        answer="HTTP/1.0 ";
+        answer+=code+"\n";
+        HttpHeader server("Server", "Model Http Server Stupenkov/0.1");
+        header+=server.GetHeader()+"\n";
         time_t t=time(0);
         HttpHeader date("Date",asctime(localtime(&t)));
         header+=date.GetHeader();
-        HttpHeader server("Server", "Model Http Server Stupenkov");
-        header+=server.GetHeader()+"\n";
+        
         if (fd>=0){
             char c;
             int length=0;
@@ -267,21 +264,41 @@ public:
         int indx=request.uri_way.find('.');
         if (indx>=0){
             string extension=request.uri_way.substr(indx+1);
-            HttpHeader content_type("Content-type", extension);
-            header+=content_type.GetHeader()+"\n";
+            if (extension=="html"){
+                HttpHeader content_type("Content-type", "text/html");
+                header+=content_type.GetHeader()+"\n";
+            }
+            else if(extension=="jpeg"){
+                HttpHeader content_type("Content-type", "image/jpeg");
+                header+=content_type.GetHeader()+"\n";
+            }
+            else {
+                HttpHeader content_type("Content-type", "text/plain");
+                header+=content_type.GetHeader()+"\n";
+            }
         }
-        answer+=header;
+        if (fd>=0){
+            struct stat result;
+            if (stat(request.uri_way.c_str(),&result)==0){
+                time_t t1=result.st_mtime;
+                HttpHeader last_mod("Last-modified", asctime(localtime(&t1)));
+                header+=last_mod.GetHeader();
+            }  
+        } 
+        answer+=header+"\n\n";
         if (fd>=0 && request.method=="GET"){
             char mas[BUF];
             int i;
             string s;
-            answer+="File: ";
             while((i=read(fd,mas,BUF))>0){
                 for (int j=0;j<i;j++)
                     s+=string(1,mas[j]);
                 answer+=s;
                 s.clear();
             }
+        }
+        else if(fd<0){
+            answer+=code;
         }
         answer+="\n\n";
         csd.Write(answer);
@@ -297,35 +314,35 @@ class HttpServer{
     int exit1,exit2;
 public:
     HttpServer(int port, int n) : server(), servaddr("127.0.0.1",port), queue(n), exit1(0), exit2(0){}
-    void ProcessConnection(int cd, const SocketAddress& claddr){
+    void ProcessConnection(int cd, const SocketAddress& claddr){     //обработка запроса
         ConnectedSocket cs(cd);
-        string request;
-        for(;;){
-            cs.Read(request); 
-            cout<<"Request: "<<request<<endl;
-            int pos=request.find("\n");
-            string req=request.substr(0,pos);
-            if (req=="Disconnect"){
-                cout<<"Client Disconnected"<<endl;
-                exit1=1;
-            }
-            else if (req=="Close"){
-                cout<<"Server closed"<<endl;
-                exit2=1;
-            }
-            else if (!request.empty()){
-                HttpRequest text(request);
-                HttpResponse response(text,cs);
-                cout<<response.GetAnswer();
-            }
-            request.clear();
-            if (exit1 || exit2){
-                cs.Shutdown();
-                break;
-            }
+        string request;  
+        cs.Read(request); 
+        cout<<"Request: "<<request<<endl;
+        int pos=request.find("\n");
+        string req=request.substr(0,pos);
+        if (req=="Disconnect"){
+            cout<<"Client Disconnected"<<endl;
+            exit1=1;
         }
+        else if (req=="Close"){
+            cout<<"Server closed"<<endl;
+            exit2=1;
+        }
+        else if (!request.empty()){
+            HttpRequest text(request);
+            HttpResponse response(text,cs);
+            cout<<response.GetAnswer();
+        }
+        request.clear();
+        if (exit1 || exit2){
+            exit1=0;
+            exit(1);
+        }
+        cs.Shutdown();
+        cout<<"Shutdown client"<<endl;
     }
-    void ServerLoop(){
+    void ServerLoop(){   //установление соединения
         try{
             server.Bind(servaddr);
             server.Listen(queue);
@@ -357,7 +374,7 @@ public:
 int main()
 {
     try{
-        HttpServer server(1234,5);
+        HttpServer server(DEFPORT,5);
         server.ServerLoop();
     }
     catch(Error err){

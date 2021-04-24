@@ -15,6 +15,7 @@
 using namespace std;
 
 #define BUF 2048
+#define DEFPORT 1234
 
 class Error{
     string str;
@@ -73,15 +74,17 @@ public:
         }
         return NULL;
     }
-    string Read (){
+    void Read (string &s){
         char msg[BUF];
+        memset(msg,0,BUF);
         int tmp=recv(Getsd(), msg, BUF, 0);
         if (tmp<0)
-            throw Error("Recieve");
+            cerr<<"No client"<<endl;
         else{
-            string s=msg; 
-            return s; 
-        } 
+            s=msg; 
+            memset(msg,0,BUF);
+        }   
+                          
     }
     void Write(const string& str){
         vector<char> tmp(str.begin(),str.end());
@@ -175,9 +178,9 @@ public:
         };
         cout<<"Client connected to server\n";
         string request;
+        string response;
         int counter=0;
         ifstream file("in.txt");
-        for(;;){
             if ((counter==0) && file){
                 getline(file,request);
                 counter++;
@@ -196,6 +199,8 @@ public:
             HttpHeader user_agent("User-agent","client.cpp");
             request+=user_agent.GetHeader()+"\n";
             client.Write(request);
+            client.Read(response);
+            cout<<"Response:"<<response<<endl;
             if (req=="Disconnect"){
                 sleep(1);
                 cout<<"Client Disconnected"<<endl;
@@ -206,19 +211,16 @@ public:
                 cout<<"Server closed; Client Disconnected"<<endl;
                 _exit=1;
             }
-            if (_exit)
-                break;
             request.clear();
             req.clear();
-        }
-        
+            cout<<"Client disconnected"<<endl;
     }
 };
 
 int main()
 {
     try{
-    HttpClient client(1234);
+    HttpClient client(DEFPORT);
     client.ClientConnection();
     }
     catch (Error err){
