@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <sys/stat.h>
 #include <vector>
+#include <signal.h>
 
 using namespace std;
 
@@ -95,8 +96,10 @@ public:
     }
     int Shutdown(){
         int status=shutdown(Getsd(),2);
-        if (status<0)
+        if (status<0){
+            cerr<<strerror(errno)<<endl;
             throw Error("In shutdown");
+        }
         return status;
     }
 };
@@ -262,13 +265,14 @@ public:
             header+=content_len.GetHeader()+"\n";
         }
         int indx=request.uri_way.find('.');
+        string extension;
         if (indx>=0){
-            string extension=request.uri_way.substr(indx+1);
+            extension=request.uri_way.substr(indx+1);
             if (extension=="html"){
                 HttpHeader content_type("Content-type", "text/html");
                 header+=content_type.GetHeader()+"\n";
             }
-            else if(extension=="jpeg"){
+            else if(extension=="jpg" || extension=="jpeg"){
                 HttpHeader content_type("Content-type", "image/jpeg");
                 header+=content_type.GetHeader()+"\n";
             }
@@ -285,8 +289,8 @@ public:
                 header+=last_mod.GetHeader();
             }  
         } 
-        answer+=header+"\n\n";
-        if (fd>=0 && request.method=="GET"){
+        answer+=header+"\r\n";
+        if (fd>=0 && request.method=="GET" && extension!="jpg"){
             char mas[BUF];
             int i;
             string s;
@@ -296,12 +300,24 @@ public:
                 answer+=s;
                 s.clear();
             }
+            answer+="\r\n";
+            csd.Write(answer);
         }
-        else if(fd<0){
+        else if (fd<0){
             answer+=code;
+            answer+="\r\n";
+            csd.Write(answer);
         }
-        answer+="\n\n";
-        csd.Write(answer);
+        else if (extension=="jpg"){
+            char mas[BUF];
+            int i;
+            csd.Write(answer);
+            while((i=read(fd,mas,BUF))>0){
+                csd.Write(mas,i);
+            }
+            cout<<"Image send"<<endl;
+        }
+        extension.clear();
         close(fd);
     }
     const string GetAnswer() const {return answer;}
