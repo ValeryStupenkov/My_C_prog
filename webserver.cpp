@@ -14,20 +14,21 @@
 #include <sys/stat.h>
 #include <vector>
 #include <signal.h>
+#include <sys/wait.h>
 
 using namespace std;
 
 #define BUF 2048
 #define DEFPORT 1234
 
-class Error{
+class Error{       // класс для обработки ошибок
     string str;
 public:
     Error(string s) : str(s){}
     string GetErr(){ return str;}
 };
 
-class SocketAddress {
+class SocketAddress {    
 protected:
     struct sockaddr_in _sockaddr;
 public:
@@ -59,17 +60,6 @@ class ConnectedSocket : public Socket{
 public:
     ConnectedSocket() : Socket() {}
     explicit ConnectedSocket(int _sd) : Socket(_sd) {}
-    string Read(int flag){
-        char msg[BUF];
-        int tmp=recv(Getsd(), msg, BUF, flag);
-        if (tmp<0)
-            throw Error("Recieve");
-        else{
-            string str(msg);
-            return str;
-        }
-        return NULL;
-    }
     void Read (string &s){
         char msg[BUF];
         memset(msg,0,BUF);
@@ -138,7 +128,7 @@ public:
     }
 };
 
-class HttpHeader{
+class HttpHeader{   // класс для http заголовка
     string name;
     string value;
 public:
@@ -158,7 +148,8 @@ public:
     }
 };
 
-class HttpRequest{
+class HttpRequest{  //обработка запроса http
+    string full;
     string method;
     string uri_way;
     string parameters;
@@ -166,9 +157,12 @@ class HttpRequest{
     string body;
     int syntaxerr;
     int index;
+    int iscgi;
+    int size_of_r;
 public:
-    HttpRequest(const string& request) : method(), uri_way(), parameters(), version(), body(), syntaxerr(0), index(0){
+    HttpRequest(const string& request) : full(request), method(), uri_way(), parameters(), version(), body(), syntaxerr(0), index(0), iscgi(0), size_of_r(0){
         string tmp=request;
+        size_of_r=request.size();
         int pos=tmp.find(" ");
         if (pos<0)
             syntaxerr=1;
@@ -186,9 +180,11 @@ public:
             else{
             int pos2=tmp.find("?");
             if (pos2!=-1){
-                uri_way=uri.substr(0,pos2);
-                uri.erase(0,pos2+1);
+                uri_way=uri.substr(0,pos2-1);
+                cout<<uri_way<<endl;
+                uri.erase(0,pos2);
                 parameters=uri;
+                iscgi=1;
             }   
             else{
                 uri_way=uri.substr(0,uri.size()-1);
@@ -213,34 +209,85 @@ public:
         }
         body=tmp;
     } 
-    friend ostream &operator<<(ostream &str, HttpRequest &r){
-        if(!r.parameters.empty())
-            str<<"\n"<<r.method<<" "<<"/"<<r.uri_way<<"?"<<r.parameters<<" "<<"HTTP/"<<r.version;
-        else
-            str<<"\n"<<r.method<<" "<<"/"<<r.uri_way<<" "<<"HTTP/"<<r.version;
-        return str;
-    }  
     friend class HttpResponse;
+    friend char** CreateEnvironment(HttpRequest &request);
 };
 
-class HttpResponse{
+char** CreateEnvironment(HttpRequest &request){   // создание набора переменных окружения
+    char **env=new char*[8];
+    env[0]=new char[22];
+    env[0]=(char*)"SERVER_ADDR=127.0.0.1";
+    env[1]=new char[40];
+    env[1]=(char*)"SERVER_NAME=Model Http Server Stupenkov";
+    env[2]=new char[17];
+    env[2]=(char*)"SERVER_PORT=1234";
+    env[3]=new char[24];
+    env[3]=(char*)"CONTENT_TYPE=text/plain";
+    env[4]=new char[25];
+    env[4]=(char*)"SERVER_PROTOCOL=HTTP/1.0";
+    env[5]=new char[13+request.uri_way.size()];
+    strcpy(env[5],"SCRIPT_NAME=");
+    strcat(env[5],request.uri_way.c_str());
+    env[6]=new char[14+request.parameters.size()];
+    strcpy(env[6],"QUERY_STRING=");
+    strcat(env[6],request.parameters.c_str());
+    env[7]=NULL;
+    return env;
+};
+
+
+class HttpResponse{   //ответ сервера 
     string header;
     string code;
     string answer;
     string body;
 public:
     HttpResponse(HttpRequest& request, ConnectedSocket &csd) : header(), code(), answer(), body(){
-        int fd=open(request.uri_way.c_str(),O_RDONLY);
-        if (fd==-1){
-            if (errno == EACCES)
-                code="403 Forbidden";
-            else if (request.syntaxerr==1)
-                code="400 Bad Request";
-            else 
-                code="404 Not Found";
+        int fd;
+        if (request.iscgi==1){
+            int pid;
+            if ((pid=fork())>0){
+                int status;
+                wait(&status);
+                if (WIFEXITED(status) && (WEXITSTATUS(status)==0)){
+                    fd=open("temporary.txt",O_RDONLY);
+                    code="200 OK";
+                }
+                else {
+                    code="404 NOT FOUND";
+                }
+            }
+            else if (pid==0){
+                fd=open("temporary.txt",O_WRONLY|O_TRUNC|O_CREAT,0666);
+                if (fd<0){
+                    throw Error("Error in open");
+                }
+                dup2(fd,1);
+                close(fd);
+                char *argv[]={(char*)request.uri_way.c_str(),NULL};
+                char **env=CreateEnvironment(request);
+                execvpe(request.uri_way.c_str(), argv, env);
+                perror("execvpe");
+                exit(2);
+            }
+            else if (pid<0){
+                perror("Fork error!!!");
+                exit(1);
+            }
         }
-        else{
-            code="200 OK"; 
+        else {
+            fd=open(request.uri_way.c_str(),O_RDONLY);
+            if (fd==-1){
+                if (errno == EACCES)
+                    code="403 Forbidden";
+                else if (request.syntaxerr==1)
+                    code="400 Bad Request";
+                else 
+                    code="404 Not Found";
+            }
+            else{
+                code="200 OK"; 
+            }
         }
         if (request.method!="GET"&&request.method!="HEAD"){
             code="501 Not Implemented";
