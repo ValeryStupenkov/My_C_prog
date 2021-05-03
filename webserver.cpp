@@ -39,9 +39,11 @@ public:
         _sockaddr.sin_port=htons(port);
         _sockaddr.sin_addr.s_addr=inet_addr(IP_addr);      
     }
-    const struct sockaddr* GetAddr() const { return (sockaddr*)&_sockaddr;}
-    const int GetAddrlen() const { return sizeof(_sockaddr);}
+    struct sockaddr* GetAddr() const { return (sockaddr*)&_sockaddr;}
+    socklen_t GetAddrlen() const { return sizeof(_sockaddr);}
 };
+
+SocketAddress claddr;  // адрес клиента
 
 class Socket{
 protected:
@@ -69,15 +71,13 @@ public:
         else{
             s=msg; 
             memset(msg,0,BUF);
-        }   
-                          
+        }                
     }
     void Write(const string& str){
         vector<char> tmp(str.begin(),str.end());
         int status=send(Getsd(), tmp.data(), tmp.size(),0);
         if (status<0)
             throw Error("Send");
-        
     }
     void Write(char *c, int len){
         int tmp=send(Getsd(),c,len,0);
@@ -111,7 +111,7 @@ public:
         }  
     }
     int Accept(SocketAddress &Claddr){
-        int csd=accept(Getsd(), NULL, NULL);
+        int csd=accept(Getsd(),NULL,NULL);
         if (csd<0) 
             throw Error("In accept");
         return csd;
@@ -214,7 +214,7 @@ public:
 };
 
 char** CreateEnvironment(HttpRequest &request){   // создание набора переменных окружения
-    char **env=new char*[8];
+    char **env=new char*[12];
     env[0]=new char[22];
     env[0]=(char*)"SERVER_ADDR=127.0.0.1";
     env[1]=new char[40];
@@ -231,7 +231,16 @@ char** CreateEnvironment(HttpRequest &request){   // создание набор
     env[6]=new char[14+request.parameters.size()];
     strcpy(env[6],"QUERY_STRING=");
     strcat(env[6],request.parameters.c_str());
-    env[7]=NULL;
+    env[7]=new char[26];
+    env[7]=(char*)"GATEWAY_INTERFACE=CGI/1.1";
+    env[8]=new char[40];
+    env[8]=(char*)"SERVER_SOFTWARE=Linux Mint/4.6.6 (Unix)";
+    env[9]=new char[64+request.uri_way.size()];
+    strcpy(env[9],"SCRIPT_FILENAME=/home/valerystupenkov/Prac/My_C_Prog2/My_C_prog");
+    strcat(env[9],request.uri_way.c_str());
+    env[10]=new char[62];
+    env[10]=(char*)"DOCUMENT_ROOT=/home/valerystupenkov/Prac/My_C_Prog2/My_C_prog";
+    env[11]=NULL;
     return env;
 };
 
@@ -416,7 +425,6 @@ public:
         } 
         for(;;){
             int cd;
-            SocketAddress claddr;
             cout<<"Waiting for connection...\n";
             try{cd=server.Accept(claddr);}
             catch(Error err){
