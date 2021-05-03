@@ -41,6 +41,8 @@ public:
     }
     struct sockaddr* GetAddr() const { return (sockaddr*)&_sockaddr;}
     socklen_t GetAddrlen() const { return sizeof(_sockaddr);}
+    int GetPort() const {return _sockaddr.sin_port;}
+    char* GetIP() const {return inet_ntoa(_sockaddr.sin_addr);}
 };
 
 SocketAddress claddr;  // адрес клиента
@@ -111,7 +113,10 @@ public:
         }  
     }
     int Accept(SocketAddress &Claddr){
-        int csd=accept(Getsd(),NULL,NULL);
+        int len=Claddr.GetAddrlen();
+        int *point;
+        point=&len;
+        int csd=accept(Getsd(),Claddr.GetAddr(),(socklen_t*)point);
         if (csd<0) 
             throw Error("In accept");
         return csd;
@@ -181,7 +186,6 @@ public:
             int pos2=tmp.find("?");
             if (pos2!=-1){
                 uri_way=uri.substr(0,pos2-1);
-                cout<<uri_way<<endl;
                 uri.erase(0,pos2);
                 parameters=uri;
                 iscgi=1;
@@ -214,7 +218,7 @@ public:
 };
 
 char** CreateEnvironment(HttpRequest &request){   // создание набора переменных окружения
-    char **env=new char*[12];
+    char **env=new char*[14];
     env[0]=new char[22];
     env[0]=(char*)"SERVER_ADDR=127.0.0.1";
     env[1]=new char[40];
@@ -240,7 +244,15 @@ char** CreateEnvironment(HttpRequest &request){   // создание набор
     strcat(env[9],request.uri_way.c_str());
     env[10]=new char[62];
     env[10]=(char*)"DOCUMENT_ROOT=/home/valerystupenkov/Prac/My_C_Prog2/My_C_prog";
-    env[11]=NULL;
+    int port=claddr.GetPort();
+    const char *c=to_string(port).c_str();
+    env[11]=new char[13+to_string(port).size()];
+    strcpy(env[11],"REMOTE_PORT=");
+    strcat(env[11],c);
+    env[12]=new char[28];
+    strcpy(env[12],"REMOTE_ADDR=");
+    strcat(env[12],claddr.GetIP());
+    env[13]=NULL;
     return env;
 };
 
